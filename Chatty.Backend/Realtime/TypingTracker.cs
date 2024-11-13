@@ -5,12 +5,15 @@ namespace Chatty.Backend.Realtime;
 public sealed class TypingTracker(ILogger<TypingTracker> logger) : ITypingTracker
 {
     private static readonly TimeSpan TypingTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan RateLimitDuration = TimeSpan.FromSeconds(1);
     private readonly ConcurrentDictionary<Guid, ConcurrentDictionary<Guid, DateTime>> _channelTyping = new();
     private readonly ConcurrentDictionary<(Guid, Guid), DateTime> _directTyping = new();
+    private readonly ConcurrentDictionary<Guid, DateTime> _lastTypingUpdate = new();
     private readonly ILogger<TypingTracker> _logger = logger;
 
     public Task TrackTypingAsync(Guid channelId, Guid userId, CancellationToken ct = default)
     {
+        _lastTypingUpdate.AddOrUpdate(userId, DateTime.UtcNow, (_, _) => DateTime.UtcNow);
         var channelUsers = _channelTyping.GetOrAdd(channelId, _ => new ConcurrentDictionary<Guid, DateTime>());
         channelUsers.AddOrUpdate(userId, DateTime.UtcNow, (_, _) => DateTime.UtcNow);
         return Task.CompletedTask;
@@ -45,6 +48,15 @@ public sealed class TypingTracker(ILogger<TypingTracker> logger) : ITypingTracke
             return Task.FromResult(DateTime.UtcNow - lastTyped <= TypingTimeout);
         }
 
+        return Task.FromResult(false);
+    }
+
+    public Task<bool> IsRateLimitedAsync(Guid userId, CancellationToken ct = default)
+    {
+        if (_lastTypingUpdate.TryGetValue(userId, out var lastUpdate))
+        {
+            return Task.FromResult(DateTime.UtcNow - lastUpdate < RateLimitDuration);
+        }
         return Task.FromResult(false);
     }
 }

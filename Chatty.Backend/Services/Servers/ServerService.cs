@@ -241,7 +241,7 @@ public sealed class ServerService : IServerService
                 Name = request.Name,
                 Color = request.Color,
                 Position = request.Position,
-                Permissions = request.Permissions
+                Permissions = ConvertToServerRolePermissions(request.Permissions)
             };
 
             _context.ServerRoles.Add(role);
@@ -259,6 +259,11 @@ public sealed class ServerService : IServerService
             _logger.LogError(ex, "Failed to create role for server {ServerId}", serverId);
             return Result<ServerRoleDto>.Failure(Error.Internal("Failed to create role"));
         }
+    }
+
+    private static ICollection<ServerRolePermission> ConvertToServerRolePermissions(ICollection<PermissionType> permissions)
+    {
+        return permissions.Select(p => new ServerRolePermission { Permission = p }).ToList();
     }
 
     public async Task<Result<bool>> AddMemberAsync(

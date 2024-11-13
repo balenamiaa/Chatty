@@ -136,5 +136,24 @@ public sealed class VoiceModule : ICarterModule
                     detail: result.Error.Message,
                     statusCode: StatusCodes.Status400BadRequest);
         });
+
+        // Add signaling endpoint
+        group.MapPost("/calls/{callId}/signal", async (
+            Guid callId,
+            [FromBody] SignalingMessage message,
+            IVoiceService voiceService,
+            ClaimsPrincipal user,
+            CancellationToken ct) =>
+        {
+            var userId = Guid.Parse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+            var result = await voiceService.SendSignalingMessageAsync(callId, userId, message, ct);
+
+            return result.IsSuccess
+                ? Results.NoContent()
+                : Results.Problem(
+                    title: result.Error.Code,
+                    detail: result.Error.Message,
+                    statusCode: StatusCodes.Status400BadRequest);
+        });
     }
 }

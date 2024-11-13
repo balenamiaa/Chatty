@@ -271,4 +271,37 @@ public sealed class ChannelService : IChannelService
             return Result<bool>.Failure(Error.Internal("Failed to remove member"));
         }
     }
+
+    public async Task<Result<bool>> CanAccessAsync(
+        Guid userId,
+        Guid channelId,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var channel = await _context.Channels
+                .Include(c => c.Members)
+                .FirstOrDefaultAsync(c => c.Id == channelId, ct);
+
+            if (channel is null)
+                return Result<bool>.Failure(Error.NotFound("Channel not found"));
+
+            // If channel is not private, anyone can access
+            if (!channel.IsPrivate)
+                return Result<bool>.Success(true);
+
+            // For private channels, check membership
+            var isMember = channel.Members.Any(m => m.UserId == userId);
+            if (!isMember)
+                return Result<bool>.Failure(Error.Forbidden("User is not a member of this channel"));
+
+            return Result<bool>.Success(true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to check channel access for user {UserId} in channel {ChannelId}", 
+                userId, channelId);
+            return Result<bool>.Failure(Error.Internal("Failed to check channel access"));
+        }
+    }
 }

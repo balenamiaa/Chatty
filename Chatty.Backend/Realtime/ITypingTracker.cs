@@ -6,4 +6,5 @@ public interface ITypingTracker
     Task TrackDirectTypingAsync(Guid userId, Guid recipientId, CancellationToken ct = default);
     Task<IReadOnlyList<Guid>> GetTypingUsersAsync(Guid channelId, CancellationToken ct = default);
     Task<bool> IsUserTypingAsync(Guid userId, Guid recipientId, CancellationToken ct = default);
+    Task<bool> IsRateLimitedAsync(Guid userId, CancellationToken ct = default);
 }

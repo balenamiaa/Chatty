@@ -13,4 +13,5 @@ public interface IChannelService : IService
     Task<Result<IReadOnlyList<ChannelDto>>> GetForServerAsync(Guid serverId, CancellationToken ct = default);
     Task<Result<bool>> AddMemberAsync(Guid channelId, Guid userId, CancellationToken ct = default);
     Task<Result<bool>> RemoveMemberAsync(Guid channelId, Guid userId, CancellationToken ct = default);
+    Task<Result<bool>> CanAccessAsync(Guid userId, Guid channelId, CancellationToken ct = default);
 }

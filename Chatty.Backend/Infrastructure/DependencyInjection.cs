@@ -17,6 +17,7 @@ using Chatty.Backend.Services.Messages;
 using Chatty.Backend.Services.Servers;
 using Chatty.Backend.Services.Stickers;
 using Chatty.Backend.Services.Users;
+using Chatty.Backend.Services.Voice;
 using Chatty.Shared.Crypto;
 using Chatty.Shared.Crypto.KeyExchange;
 using Chatty.Shared.Crypto.Session;
@@ -56,6 +57,7 @@ public static class DependencyInjection
         services.AddScoped<IChannelService, ChannelService>();
         services.AddScoped<IContactService, ContactService>();
         services.AddScoped<IFileService, FileService>();
+        services.AddScoped<IVoiceService, VoiceService>();
 
         // Add SignalR
         services.AddSignalR(options =>

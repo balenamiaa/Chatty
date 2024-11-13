@@ -15,4 +15,5 @@ public interface IVoiceService : IService
     Task<Result<bool>> MuteParticipantAsync(Guid callId, Guid userId, bool muted, CancellationToken ct = default);
     Task<Result<bool>> EnableVideoAsync(Guid callId, Guid userId, bool enabled, CancellationToken ct = default);
     Task<Result<IReadOnlyList<CallParticipantDto>>> GetParticipantsAsync(Guid callId, CancellationToken ct = default);
+    Task<Result<bool>> SendSignalingMessageAsync(Guid callId, Guid userId, SignalingMessage message, CancellationToken ct = default);
 }

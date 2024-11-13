@@ -303,6 +303,27 @@ public sealed class EventDispatcher : IEventDispatcher
         }
     }
 
+    public async Task DispatchBatchNotificationsAsync(
+        IEnumerable<string> deviceTokens,
+        string title,
+        string message,
+        Dictionary<string, string>? data = null)
+    {
+        try
+        {
+            var tasks = deviceTokens.Select(token =>
+                _hubContext.Clients
+                    .Client(token)
+                    .OnNotification(title, message));
+
+            await Task.WhenAll(tasks);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to dispatch batch notifications");
+        }
+    }
+
     private async Task DispatchToUserAsync(Guid userId, Func<IChatHubClient, Task> dispatch)
     {
         try

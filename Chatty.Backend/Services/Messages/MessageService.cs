@@ -234,18 +234,21 @@ public sealed class MessageService : IMessageService
         DateTime? before = null,
         CancellationToken ct = default)
     {
+        // Start with base query
         var query = _context.Messages
-            .Where(m => m.ChannelId == channelId)
-            .OrderByDescending(m => m.SentAt)
-            .Include(m => m.Sender)
-            .Include(m => m.Attachments);
+            .Where(m => m.ChannelId == channelId);
 
+        // Add before filter if specified
         if (before.HasValue)
         {
             query = query.Where(m => m.SentAt < before.Value);
         }
 
+        // Apply ordering and includes after all filters
         var messages = await query
+            .OrderByDescending(m => m.SentAt)
+            .Include(m => m.Sender)
+            .Include(m => m.Attachments)
             .Take(limit)
             .ToListAsync(ct);
 
@@ -263,18 +266,20 @@ public sealed class MessageService : IMessageService
         var query = _context.DirectMessages
             .Where(m =>
                 (m.SenderId == userId && m.RecipientId == otherUserId) ||
-                (m.SenderId == otherUserId && m.RecipientId == userId))
-            .OrderByDescending(m => m.SentAt)
-            .Include(m => m.Sender)
-            .Include(m => m.Recipient)
-            .Include(m => m.Attachments);
+                (m.SenderId == otherUserId && m.RecipientId == userId));
 
+        // Apply before filter first
         if (before.HasValue)
         {
             query = query.Where(m => m.SentAt < before.Value);
         }
 
+        // Then apply ordering and includes
         var messages = await query
+            .OrderByDescending(m => m.SentAt)
+            .Include(m => m.Sender)
+            .Include(m => m.Recipient)
+            .Include(m => m.Attachments)
             .Take(limit)
             .ToListAsync(ct);
 

@@ -5,6 +5,7 @@ using Chatty.Shared.Models.Common;
 using Chatty.Shared.Models.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Chatty.Backend.Security.Hashing;
 
 namespace Chatty.Backend.Services.Users;
 
@@ -127,7 +128,7 @@ public sealed class UserService : IUserService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to delete user {UserId}", userId);
-            return Result<UserDto>.Failure(Error.Internal("Failed to delete user"));
+            return Result<bool>.Failure(Error.Internal("Failed to delete user"));
         }
     }
 
@@ -174,7 +175,6 @@ public sealed class UserService : IUserService
         string newPassword,
         CancellationToken ct = default)
     {
-        // Use security settings for password hashing
         var options = new HashingOptions
         {
             Iterations = _securitySettings.PasswordHashingIterations

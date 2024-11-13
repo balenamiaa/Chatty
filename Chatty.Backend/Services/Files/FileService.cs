@@ -187,7 +187,7 @@ public sealed class FileService : IFileService
         try
         {
             var thumbnailFileName = $"thumb_{fileName}";
-            var thumbnailPath = Path.Combine(_thumbnailPath thumbnailFileName);
+            var thumbnailPath = Path.Combine(_thumbnailPath, thumbnailFileName);
 
             using var image = await Image.LoadAsync(filePath, ct);
             var ratio = (float)_storageSettings.ThumbnailSize / Math.Max(image.Width, image.Height);
