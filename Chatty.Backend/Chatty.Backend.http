@@ -1,0 +1,6 @@
+@Chatty.Backend_HostAddress = http://localhost:5227
+
+GET {{Chatty.Backend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
