@@ -43,6 +43,9 @@ public sealed class ChattyDbContext : DbContext
             entity.Property(e => e.FirstName).HasMaxLength(50);
             entity.Property(e => e.LastName).HasMaxLength(50);
             entity.Property(e => e.Locale).HasMaxLength(10);
+
+            // Configure NotificationPreferences as an owned type
+            entity.OwnsOne(e => e.NotificationPreferences);
         });
 
         // UserDevice configuration
@@ -386,5 +389,19 @@ public sealed class ChattyDbContext : DbContext
                 .HasForeignKey(s => s.CreatorId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
+
+        // Add missing indexes
+        modelBuilder.Entity<Message>()
+            .HasIndex(m => new { m.ChannelId, m.SenderId, m.SentAt });
+
+        modelBuilder.Entity<UserDevice>()
+            .HasIndex(d => new { d.UserId, d.LastActiveAt });
+
+        modelBuilder.Entity<Attachment>()
+            .HasIndex(a => a.ContentType);
+
+        // Add soft delete filter
+        modelBuilder.Entity<Message>()
+            .HasQueryFilter(m => !m.IsDeleted);
     }
 }

@@ -127,11 +127,16 @@ public sealed class ContactService(
         CancellationToken ct = default)
     {
         var contact = await context.Contacts
+            .Include(c => c.User)
             .Include(c => c.ContactUser)
-            .FirstOrDefaultAsync(c => c.Id == contactId && c.UserId == userId, ct);
+            .FirstOrDefaultAsync(c => c.Id == contactId, ct);
 
         if (contact is null)
             return Result<bool>.Failure(Error.NotFound("Contact not found"));
+
+        // Verify the accepting user is the contact user
+        if (contact.ContactUserId != userId)
+            return Result<bool>.Failure(Error.Unauthorized("Only the contact recipient can accept the request"));
 
         if (contact.Status != ContactStatus.Pending)
             return Result<bool>.Failure(Error.Validation("Contact is not pending"));
@@ -142,9 +147,11 @@ public sealed class ContactService(
             contact.Status = ContactStatus.Accepted;
 
             var reciprocalContact = await context.Contacts
+                .Include(c => c.User)
+                .Include(c => c.ContactUser)
                 .FirstOrDefaultAsync(c =>
                     c.UserId == contact.ContactUserId &&
-                    c.ContactUserId == userId, ct);
+                    c.ContactUserId == contact.UserId, ct);
 
             if (reciprocalContact is not null)
             {
@@ -152,6 +159,11 @@ public sealed class ContactService(
             }
 
             await context.SaveChangesAsync(ct);
+
+            // Publish contact accepted event
+            await eventBus.PublishAsync(
+                new ContactRequestEvent(userId, contact.UserId, reciprocalContact?.ToDto() ?? contact.ToDto()),
+                ct);
 
             return Result<bool>.Success(true);
         }
@@ -168,6 +180,7 @@ public sealed class ContactService(
         CancellationToken ct = default)
     {
         var contact = await context.Contacts
+            .Include(c => c.User)
             .Include(c => c.ContactUser)
             .FirstOrDefaultAsync(c => c.Id == contactId && c.UserId == userId, ct);
 
@@ -176,8 +189,27 @@ public sealed class ContactService(
 
         try
         {
+            // Update both contacts to blocked
             contact.Status = ContactStatus.Blocked;
+
+            var reciprocalContact = await context.Contacts
+                .Include(c => c.User)
+                .Include(c => c.ContactUser)
+                .FirstOrDefaultAsync(c =>
+                    c.UserId == contact.ContactUserId &&
+                    c.ContactUserId == userId, ct);
+
+            if (reciprocalContact is not null)
+            {
+                reciprocalContact.Status = ContactStatus.Blocked;
+            }
+
             await context.SaveChangesAsync(ct);
+
+            // Publish contact blocked event
+            await eventBus.PublishAsync(
+                new ContactRequestEvent(userId, contact.ContactUserId, contact.ToDto()),
+                ct);
 
             return Result<bool>.Success(true);
         }

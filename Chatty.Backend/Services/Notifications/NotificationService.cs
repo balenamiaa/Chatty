@@ -9,22 +9,12 @@ using Microsoft.Extensions.Options;
 
 namespace Chatty.Backend.Services.Notifications;
 
-public sealed class NotificationService : INotificationService
+public sealed class NotificationService(
+    ChattyDbContext context,
+    ILogger<NotificationService> logger,
+    IOptions<NotificationSettings> notificationSettings)
+    : INotificationService
 {
-    private readonly ChattyDbContext _context;
-    private readonly ILogger<NotificationService> _logger;
-    private readonly NotificationSettings _notificationSettings;
-
-    public NotificationService(
-        ChattyDbContext context,
-        ILogger<NotificationService> logger,
-        IOptions<NotificationSettings> notificationSettings)
-    {
-        _context = context;
-        _logger = logger;
-        _notificationSettings = notificationSettings.Value;
-    }
-
     public async Task<Result<bool>> SendToUserAsync(
         Guid userId,
         string title,
@@ -35,7 +25,7 @@ public sealed class NotificationService : INotificationService
         try
         {
             // Get user's devices
-            var devices = await _context.UserDevices
+            var devices = await context.UserDevices
                 .Where(d => d.UserId == userId)
                 .ToListAsync(ct);
 
@@ -66,7 +56,7 @@ public sealed class NotificationService : INotificationService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send notification to user {UserId}", userId);
+            logger.LogError(ex, "Failed to send notification to user {UserId}", userId);
             return Result<bool>.Failure(Error.Internal("Failed to send notification"));
         }
     }
@@ -80,7 +70,7 @@ public sealed class NotificationService : INotificationService
     {
         try
         {
-            var device = await _context.UserDevices
+            var device = await context.UserDevices
                 .FirstOrDefaultAsync(d => d.DeviceToken == deviceToken, ct);
 
             if (device is null)
@@ -107,7 +97,7 @@ public sealed class NotificationService : INotificationService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send notification to device {DeviceToken}", deviceToken);
+            logger.LogError(ex, "Failed to send notification to device {DeviceToken}", deviceToken);
             return Result<bool>.Failure(Error.Internal("Failed to send notification"));
         }
     }
@@ -121,7 +111,7 @@ public sealed class NotificationService : INotificationService
     {
         try
         {
-            var devices = await _context.UserDevices
+            var devices = await context.UserDevices
                 .Where(d => deviceTokens.Contains(d.DeviceToken!))
                 .ToListAsync(ct);
 
@@ -156,7 +146,7 @@ public sealed class NotificationService : INotificationService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send notifications to multiple devices");
+            logger.LogError(ex, "Failed to send notifications to multiple devices");
             return Result<bool>.Failure(Error.Internal("Failed to send notifications"));
         }
     }
@@ -168,7 +158,7 @@ public sealed class NotificationService : INotificationService
     {
         try
         {
-            var device = await _context.UserDevices
+            var device = await context.UserDevices
                 .FirstOrDefaultAsync(d =>
                     d.UserId == userId &&
                     d.DeviceId == request.DeviceId, ct);
@@ -194,15 +184,15 @@ public sealed class NotificationService : INotificationService
                     DeviceType = request.DeviceType,
                     PublicKey = request.PublicKey
                 };
-                _context.UserDevices.Add(device);
+                context.UserDevices.Add(device);
             }
 
-            await _context.SaveChangesAsync(ct);
+            await context.SaveChangesAsync(ct);
             return Result<bool>.Success(true);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to register device for user {UserId}", userId);
+            logger.LogError(ex, "Failed to register device for user {UserId}", userId);
             return Result<bool>.Failure(Error.Internal("Failed to register device"));
         }
     }
@@ -214,7 +204,7 @@ public sealed class NotificationService : INotificationService
     {
         try
         {
-            var device = await _context.UserDevices
+            var device = await context.UserDevices
                 .FirstOrDefaultAsync(d =>
                     d.UserId == userId &&
                     d.DeviceToken == deviceToken, ct);
@@ -222,14 +212,14 @@ public sealed class NotificationService : INotificationService
             if (device is null)
                 return Result<bool>.Success(true); // Already unregistered
 
-            _context.UserDevices.Remove(device);
-            await _context.SaveChangesAsync(ct);
+            context.UserDevices.Remove(device);
+            await context.SaveChangesAsync(ct);
 
             return Result<bool>.Success(true);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to unregister device for user {UserId}", userId);
+            logger.LogError(ex, "Failed to unregister device for user {UserId}", userId);
             return Result<bool>.Failure(Error.Internal("Failed to unregister device"));
         }
     }

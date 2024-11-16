@@ -52,6 +52,9 @@ public sealed class ServerService : IServerService
                 IconUrl = request.IconUrl
             };
 
+            _context.Servers.Add(server);
+            await _context.SaveChangesAsync(ct);
+
             // Create default role
             var defaultRole = new ServerRole
             {
@@ -68,6 +71,9 @@ public sealed class ServerService : IServerService
                     new() { Permission = PermissionType.Speak }
                 }
             };
+
+            _context.ServerRoles.Add(defaultRole);
+            await _context.SaveChangesAsync(ct);
 
             // Add owner as member with default role
             var ownerMember = new ServerMember
@@ -89,16 +95,30 @@ public sealed class ServerService : IServerService
             var voiceChannel = new Channel
             {
                 ServerId = server.Id,
-                Name = "Voice",
+                Name = "voice",
                 ChannelType = ChannelType.Voice,
                 Position = 1
             };
 
-            _context.Servers.Add(server);
-            _context.ServerRoles.Add(defaultRole);
             _context.ServerMembers.Add(ownerMember);
             _context.Channels.Add(generalChannel);
             _context.Channels.Add(voiceChannel);
+
+            // Add owner to default channels
+            var generalMember = new ChannelMember
+            {
+                ChannelId = generalChannel.Id,
+                UserId = userId
+            };
+
+            var voiceMember = new ChannelMember
+            {
+                ChannelId = voiceChannel.Id,
+                UserId = userId
+            };
+
+            _context.ChannelMembers.Add(generalMember);
+            _context.ChannelMembers.Add(voiceMember);
 
             await _context.SaveChangesAsync(ct);
 
@@ -274,6 +294,8 @@ public sealed class ServerService : IServerService
     {
         var server = await _context.Servers
             .Include(s => s.Members)
+            .Include(s => s.Roles)
+            .Include(s => s.Channels)
             .FirstOrDefaultAsync(s => s.Id == serverId, ct);
 
         if (server is null)
@@ -288,6 +310,17 @@ public sealed class ServerService : IServerService
 
         try
         {
+            // If no role specified, use the default role
+            if (roleId == null)
+            {
+                var defaultRole = server.Roles.FirstOrDefault(r => r.IsDefault);
+                if (defaultRole == null)
+                {
+                    return Result<bool>.Failure(Error.Internal("Server has no default role"));
+                }
+                roleId = defaultRole.Id;
+            }
+
             var member = new ServerMember
             {
                 ServerId = serverId,
@@ -296,6 +329,18 @@ public sealed class ServerService : IServerService
             };
 
             _context.ServerMembers.Add(member);
+
+            // Add member to all default channels
+            foreach (var channel in server.Channels.Where(c => !c.IsPrivate))
+            {
+                var channelMember = new ChannelMember
+                {
+                    ChannelId = channel.Id,
+                    UserId = userId
+                };
+                _context.ChannelMembers.Add(channelMember);
+            }
+
             await _context.SaveChangesAsync(ct);
 
             // Load relationships for event
@@ -340,7 +385,7 @@ public sealed class ServerService : IServerService
 
             // Publish member left event
             await _eventBus.PublishAsync(
-                new ServerMemberLeftEvent(serverId, member.User.ToDto()),
+                new ServerMemberRemovedEvent(serverId, member.User.ToDto()),
                 ct);
 
             return Result<bool>.Success(true);

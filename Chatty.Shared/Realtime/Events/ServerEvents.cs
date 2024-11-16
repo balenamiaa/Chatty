@@ -1,3 +1,4 @@
+using Chatty.Shared.Models.Messages;
 using Chatty.Shared.Models.Servers;
 using Chatty.Shared.Models.Users;
 
@@ -13,9 +14,9 @@ public sealed record ServerMemberJoinedEvent(
     Guid ServerId,
     ServerMemberDto Member);
 
-public sealed record ServerMemberLeftEvent(
+public sealed record ServerMemberRemovedEvent(
     Guid ServerId,
-    UserDto User);
+    UserDto Member);
 
 public sealed record ServerMemberUpdatedEvent(
     Guid ServerId,
@@ -32,3 +33,7 @@ public sealed record ServerRoleUpdatedEvent(
 public sealed record ServerRoleDeletedEvent(
     Guid ServerId,
     Guid RoleId);
+
+public sealed record MessageUpdatedEvent(Guid ChannelId, MessageDto Message);
+
+public sealed record DirectMessageUpdatedEvent(DirectMessageDto Message);

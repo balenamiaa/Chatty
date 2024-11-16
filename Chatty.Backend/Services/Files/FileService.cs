@@ -8,6 +8,7 @@ using Chatty.Backend.Data.Models.Extensions;
 using Chatty.Backend.Infrastructure.Configuration;
 using Chatty.Shared.Models.Enums;
 using Microsoft.Extensions.Options;
+using System.Text;
 
 namespace Chatty.Backend.Services.Files;
 
@@ -50,6 +51,9 @@ public sealed class FileService : IFileService
         // Validate content type
         if (!_storageSettings.AllowedFileTypes.Contains(request.ContentType))
             return Result<AttachmentDto>.Failure(Error.Validation("File type not allowed"));
+
+        if (!await ValidateFileTypeAsync(content, request.ContentType))
+            return Result<AttachmentDto>.Failure(Error.Validation("Invalid file type"));
 
         try
         {
@@ -216,6 +220,22 @@ public sealed class FileService : IFileService
             "application/pdf" => ContentType.Document,
             "text/plain" => ContentType.Text,
             _ => ContentType.File
+        };
+    }
+
+    private async Task<bool> ValidateFileTypeAsync(Stream content, string contentType)
+    {
+        // Read first few bytes to verify file signature
+        var buffer = new byte[8];
+        await content.ReadExactlyAsync(buffer);
+        content.Position = 0;
+
+        return contentType.ToLower() switch
+        {
+            "image/jpeg" => buffer[0] == 0xFF && buffer[1] == 0xD8,
+            "image/png" => buffer[0] == 0x89 && buffer[1] == 0x50,
+            "application/pdf" => Encoding.ASCII.GetString(buffer).StartsWith("%PDF"),
+            _ => true // Allow other types
         };
     }
 }

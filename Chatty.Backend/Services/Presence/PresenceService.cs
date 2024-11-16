@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Chatty.Backend.Services.Presence;
 
 public sealed class PresenceService(
-    ChattyDbContext context,
+    IDbContextFactory<ChattyDbContext> contextFactory,
     IConnectionTracker connectionTracker,
     IEventBus eventBus,
     ILogger<PresenceService> logger)
@@ -34,6 +34,7 @@ public sealed class PresenceService(
                 (_, _) => (status, statusMessage));
 
             // Update database
+            await using var context = await contextFactory.CreateDbContextAsync(ct);
             var user = await context.Users.FindAsync([userId], ct);
             if (user is null)
                 return Result<bool>.Failure(Error.NotFound("User not found"));
@@ -63,34 +64,59 @@ public sealed class PresenceService(
     {
         try
         {
-            var user = await context.Users.FindAsync([userId], ct);
+            var isOnline = await connectionTracker.IsOnlineAsync(userId);
+
+            // Create a new scope for database operations
+            await using var context = await contextFactory.CreateDbContextAsync(ct);
+            var user = await context.Users
+                .FirstOrDefaultAsync(u => u.Id == userId, ct);
+
             if (user is null)
                 return Result<bool>.Failure(Error.NotFound("User not found"));
 
-            var isOnline = await connectionTracker.IsOnlineAsync(userId);
             var previousLastSeen = user.LastOnlineAt;
+            var wasOnline = previousLastSeen >= DateTime.UtcNow.AddMinutes(-5);
 
-            user.LastOnlineAt = isOnline ? DateTime.UtcNow : user.LastOnlineAt;
-            user.UpdatedAt = DateTime.UtcNow;
-
-            await context.SaveChangesAsync(ct);
-
-            if (isOnline == (previousLastSeen >= DateTime.UtcNow.AddMinutes(-5))) return Result<bool>.Success(true);
-
-            // If online state changed, publish event
-
-            await eventBus.PublishAsync(
-                new OnlineStateEvent(userId, isOnline),
-                ct);
-
-            // If going offline and had a custom status, reset it
-            if (!isOnline && _userStatuses.TryGetValue(userId, out var status))
+            // Always update LastOnlineAt if user is online
+            if (isOnline)
             {
-                await eventBus.PublishAsync(
-                    new PresenceEvent(userId, UserStatus.Offline, null),
-                    ct);
+                user.LastOnlineAt = DateTime.UtcNow;
+                user.UpdatedAt = DateTime.UtcNow;
+                await context.SaveChangesAsync(ct);
             }
 
+            // Only publish event if online state changed
+            if (isOnline != wasOnline)
+            {
+                try
+                {
+                    await eventBus.PublishAsync(
+                        new OnlineStateEvent(userId, isOnline),
+                        ct);
+
+                    // If going offline and had a custom status, reset it
+                    if (!isOnline && _userStatuses.TryGetValue(userId, out _))
+                    {
+                        await eventBus.PublishAsync(
+                            new PresenceEvent(userId, UserStatus.Offline, null),
+                            ct);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log but don't fail the operation if event publishing fails
+                    logger.LogWarning(ex,
+                        "Failed to publish presence events for user {UserId}. Operation will continue.",
+                        userId);
+                }
+            }
+
+            return Result<bool>.Success(true);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Log and swallow ObjectDisposedException during cleanup
+            logger.LogDebug("Context disposed while updating last seen for user {UserId}. This is expected during cleanup.", userId);
             return Result<bool>.Success(true);
         }
         catch (Exception ex)

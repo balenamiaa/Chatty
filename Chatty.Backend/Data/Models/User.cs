@@ -1,3 +1,5 @@
+using Chatty.Shared.Models.Notifications;
+
 namespace Chatty.Backend.Data.Models;
 
 public sealed class User
@@ -12,6 +14,7 @@ public sealed class User
     public string? StatusMessage { get; set; }
     public DateTime? LastOnlineAt { get; set; }
     public string Locale { get; set; } = "en-US";
+    public NotificationPreferences? NotificationPreferences { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 

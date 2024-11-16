@@ -3,54 +3,42 @@ using Chatty.Backend.Realtime.Hubs;
 using Chatty.Shared.Models.Calls;
 using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Models.Messages;
+using Chatty.Shared.Models.Servers;
 using Chatty.Shared.Models.Users;
 using Chatty.Shared.Realtime.Hubs;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
-using IChatHubClient = Chatty.Backend.Realtime.Hubs.IChatHubClient;
 
 namespace Chatty.Backend.Realtime.Events;
 
-public sealed class EventDispatcher : IEventDispatcher
+public sealed class EventDispatcher(
+    IHubContext<ChatHub, IChatHubClient> hubContext,
+    IConnectionTracker connectionTracker,
+    ILogger<EventDispatcher> logger,
+    ChattyDbContext context)
+    : IEventDispatcher
 {
-    private readonly IHubContext<ChatHub, IChatHubClient> _hubContext;
-    private readonly IConnectionTracker _connectionTracker;
-    private readonly ILogger<EventDispatcher> _logger;
-    private readonly ChattyDbContext _context;
-
-    public EventDispatcher(
-        IHubContext<ChatHub, IChatHubClient> hubContext,
-        IConnectionTracker connectionTracker,
-        ILogger<EventDispatcher> logger,
-        ChattyDbContext context)
-    {
-        _hubContext = hubContext;
-        _connectionTracker = connectionTracker;
-        _logger = logger;
-        _context = context;
-    }
-
     public async Task DispatchMessageReceivedAsync(Guid channelId, MessageDto message)
     {
         try
         {
             // Broadcast to channel group
-            await _hubContext.Clients
+            await hubContext.Clients
                 .Group($"channel_{channelId}")
                 .OnMessageReceived(channelId, message);
 
             // Also notify channel members individually for their notifications
-            var channelMembers = await _context.ChannelMembers
+            var channelMembers = await context.ChannelMembers
                 .Where(m => m.ChannelId == channelId)
                 .Select(m => m.UserId)
                 .ToListAsync();
 
             foreach (var memberId in channelMembers)
             {
-                var connections = await _connectionTracker.GetConnectionsAsync(memberId);
+                var connections = await connectionTracker.GetConnectionsAsync(memberId);
                 if (connections.Count > 0)
                 {
-                    await _hubContext.Clients
+                    await hubContext.Clients
                         .Clients(connections)
                         .OnNotification(
                             "New Message",
@@ -60,7 +48,7 @@ public sealed class EventDispatcher : IEventDispatcher
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch message received event");
+            logger.LogError(ex, "Failed to dispatch message received event");
         }
     }
 
@@ -68,13 +56,13 @@ public sealed class EventDispatcher : IEventDispatcher
     {
         try
         {
-            await _hubContext.Clients
+            await hubContext.Clients
                 .Group($"channel_{channelId}")
                 .OnMessageUpdated(channelId, message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch message updated event");
+            logger.LogError(ex, "Failed to dispatch message updated event");
         }
     }
 
@@ -82,13 +70,13 @@ public sealed class EventDispatcher : IEventDispatcher
     {
         try
         {
-            await _hubContext.Clients
+            await hubContext.Clients
                 .Group($"channel_{channelId}")
                 .OnMessageDeleted(channelId, messageId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch message deleted event");
+            logger.LogError(ex, "Failed to dispatch message deleted event");
         }
     }
 
@@ -101,7 +89,7 @@ public sealed class EventDispatcher : IEventDispatcher
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch direct message received event");
+            logger.LogError(ex, "Failed to dispatch direct message received event");
         }
     }
 
@@ -114,7 +102,7 @@ public sealed class EventDispatcher : IEventDispatcher
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch direct message updated event");
+            logger.LogError(ex, "Failed to dispatch direct message updated event");
         }
     }
 
@@ -124,11 +112,11 @@ public sealed class EventDispatcher : IEventDispatcher
         {
             // Note: This needs to be dispatched to both sender and recipient
             // You might want to modify the method signature to include both IDs
-            await _hubContext.Clients.All.OnDirectMessageDeleted(messageId);
+            await hubContext.Clients.All.OnDirectMessageDeleted(messageId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch direct message deleted event");
+            logger.LogError(ex, "Failed to dispatch direct message deleted event");
         }
     }
 
@@ -136,13 +124,13 @@ public sealed class EventDispatcher : IEventDispatcher
     {
         try
         {
-            await _hubContext.Clients
+            await hubContext.Clients
                 .Group($"channel_{channelId}")
                 .OnTypingStarted(channelId, user);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch typing started event");
+            logger.LogError(ex, "Failed to dispatch typing started event");
         }
     }
 
@@ -150,13 +138,13 @@ public sealed class EventDispatcher : IEventDispatcher
     {
         try
         {
-            await _hubContext.Clients
+            await hubContext.Clients
                 .Group($"channel_{channelId}")
                 .OnTypingStopped(channelId, user);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch typing stopped event");
+            logger.LogError(ex, "Failed to dispatch typing stopped event");
         }
     }
 
@@ -169,7 +157,7 @@ public sealed class EventDispatcher : IEventDispatcher
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch direct typing started event");
+            logger.LogError(ex, "Failed to dispatch direct typing started event");
         }
     }
 
@@ -182,7 +170,7 @@ public sealed class EventDispatcher : IEventDispatcher
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch direct typing stopped event");
+            logger.LogError(ex, "Failed to dispatch direct typing stopped event");
         }
     }
 
@@ -190,12 +178,12 @@ public sealed class EventDispatcher : IEventDispatcher
     {
         try
         {
-            await _hubContext.Clients.All
+            await hubContext.Clients.All
                 .OnUserPresenceChanged(userId, status, statusMessage);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch user presence changed event");
+            logger.LogError(ex, "Failed to dispatch user presence changed event");
         }
     }
 
@@ -203,12 +191,12 @@ public sealed class EventDispatcher : IEventDispatcher
     {
         try
         {
-            await _hubContext.Clients.All
+            await hubContext.Clients.All
                 .OnUserOnlineStateChanged(userId, isOnline);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch user online state changed event");
+            logger.LogError(ex, "Failed to dispatch user online state changed event");
         }
     }
 
@@ -218,7 +206,7 @@ public sealed class EventDispatcher : IEventDispatcher
         {
             if (call.ChannelId.HasValue)
             {
-                await _hubContext.Clients
+                await hubContext.Clients
                     .Group($"channel_{call.ChannelId}")
                     .OnCallStarted(call);
             }
@@ -231,7 +219,7 @@ public sealed class EventDispatcher : IEventDispatcher
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch call started event");
+            logger.LogError(ex, "Failed to dispatch call started event");
         }
     }
 
@@ -239,11 +227,11 @@ public sealed class EventDispatcher : IEventDispatcher
     {
         try
         {
-            await _hubContext.Clients.All.OnCallEnded(callId);
+            await hubContext.Clients.All.OnCallEnded(callId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch call ended event");
+            logger.LogError(ex, "Failed to dispatch call ended event");
         }
     }
 
@@ -251,13 +239,13 @@ public sealed class EventDispatcher : IEventDispatcher
     {
         try
         {
-            await _hubContext.Clients
+            await hubContext.Clients
                 .Group($"call_{callId}")
                 .OnParticipantJoined(callId, participant);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch participant joined event");
+            logger.LogError(ex, "Failed to dispatch participant joined event");
         }
     }
 
@@ -265,13 +253,13 @@ public sealed class EventDispatcher : IEventDispatcher
     {
         try
         {
-            await _hubContext.Clients
+            await hubContext.Clients
                 .Group($"call_{callId}")
                 .OnParticipantLeft(callId, userId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch participant left event");
+            logger.LogError(ex, "Failed to dispatch participant left event");
         }
     }
 
@@ -279,13 +267,13 @@ public sealed class EventDispatcher : IEventDispatcher
     {
         try
         {
-            await _hubContext.Clients
+            await hubContext.Clients
                 .Group($"call_{callId}")
                 .OnParticipantMuted(callId, userId, isMuted);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch participant muted event");
+            logger.LogError(ex, "Failed to dispatch participant muted event");
         }
     }
 
@@ -293,13 +281,13 @@ public sealed class EventDispatcher : IEventDispatcher
     {
         try
         {
-            await _hubContext.Clients
+            await hubContext.Clients
                 .Group($"call_{callId}")
                 .OnParticipantVideoEnabled(callId, userId, isEnabled);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch participant video enabled event");
+            logger.LogError(ex, "Failed to dispatch participant video enabled event");
         }
     }
 
@@ -312,7 +300,7 @@ public sealed class EventDispatcher : IEventDispatcher
         try
         {
             var tasks = deviceTokens.Select(token =>
-                _hubContext.Clients
+                hubContext.Clients
                     .Client(token)
                     .OnNotification(title, message));
 
@@ -320,7 +308,87 @@ public sealed class EventDispatcher : IEventDispatcher
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch batch notifications");
+            logger.LogError(ex, "Failed to dispatch batch notifications");
+        }
+    }
+
+    public async Task DispatchServerMemberJoinedAsync(Guid serverId, ServerMemberDto member)
+    {
+        try
+        {
+            await hubContext.Clients
+                .Group($"server_{serverId}")
+                .OnMemberJoined(serverId, member);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to dispatch server member joined event");
+        }
+    }
+
+    public async Task DispatchServerMemberLeftAsync(Guid serverId, Guid userId)
+    {
+        try
+        {
+            await hubContext.Clients
+                .Group($"server_{serverId}")
+                .OnMemberLeft(serverId, userId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to dispatch server member left event");
+        }
+    }
+
+    public async Task DispatchServerMemberUpdatedAsync(Guid serverId, ServerMemberDto member)
+    {
+        try
+        {
+            await hubContext.Clients
+                .Group($"server_{serverId}")
+                .OnMemberUpdated(serverId, member);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to dispatch server member updated event");
+        }
+    }
+
+    public async Task DispatchServerMemberKickedAsync(Guid serverId, Guid userId)
+    {
+        try
+        {
+            // Notify server members
+            await hubContext.Clients
+                .Group($"server_{serverId}")
+                .OnMemberLeft(serverId, userId);
+
+            // Notify kicked user
+            var connections = await connectionTracker.GetConnectionsAsync(userId);
+            if (connections.Count > 0)
+            {
+                await hubContext.Clients
+                    .Clients(connections)
+                    .OnNotification("Server Kick", "You have been removed from the server");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to dispatch server member kicked event");
+        }
+    }
+
+    public async Task DispatchSignalingMessageAsync(Guid userId, Guid senderId, string type, string data)
+    {
+        try
+        {
+            // For signaling messages, we don't need a callId as it's part of the data
+            await DispatchToUserAsync(userId,
+                client => client.OnSignalingMessage(senderId, type, data));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to dispatch signaling message");
         }
     }
 
@@ -328,15 +396,15 @@ public sealed class EventDispatcher : IEventDispatcher
     {
         try
         {
-            var connections = await _connectionTracker.GetConnectionsAsync(userId);
+            var connections = await connectionTracker.GetConnectionsAsync(userId);
             if (connections.Count > 0)
             {
-                await dispatch(_hubContext.Clients.Clients(connections));
+                await dispatch(hubContext.Clients.Clients(connections));
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dispatch event to user {UserId}", userId);
+            logger.LogError(ex, "Failed to dispatch event to user {UserId}", userId);
         }
     }
 }

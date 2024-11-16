@@ -5,14 +5,14 @@ namespace Chatty.Shared.Models.Validation;
 
 public sealed class CreateAttachmentRequestValidator : AbstractValidator<CreateAttachmentRequest>
 {
-    private static readonly string[] AllowedContentTypes = new[]
-    {
+    private static readonly string[] AllowedContentTypes =
+    [
         "image/jpeg", "image/png", "image/gif", "image/webp",
         "video/mp4", "video/webm",
         "audio/mp3", "audio/ogg", "audio/wav",
         "application/pdf",
         "text/plain"
-    };
+    ];
 
     public CreateAttachmentRequestValidator()
     {

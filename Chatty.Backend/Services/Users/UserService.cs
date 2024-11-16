@@ -9,32 +9,24 @@ using Chatty.Backend.Security.Hashing;
 
 namespace Chatty.Backend.Services.Users;
 
-public sealed class UserService : IUserService
+public sealed class UserService(
+    ChattyDbContext context,
+    ILogger<UserService> logger,
+    IOptions<SecuritySettings> securitySettings)
+    : IUserService
 {
-    private readonly ChattyDbContext _context;
-    private readonly ILogger<UserService> _logger;
-    private readonly SecuritySettings _securitySettings;
-
-    public UserService(
-        ChattyDbContext context,
-        ILogger<UserService> logger,
-        IOptions<SecuritySettings> securitySettings)
-    {
-        _context = context;
-        _logger = logger;
-        _securitySettings = securitySettings.Value;
-    }
+    private readonly SecuritySettings _securitySettings = securitySettings.Value;
 
     public async Task<Result<UserDto>> CreateAsync(
         CreateUserRequest request,
         CancellationToken ct = default)
     {
         // Check if email is already taken
-        if (await _context.Users.AnyAsync(u => u.Email == request.Email, ct))
+        if (await context.Users.AnyAsync(u => u.Email == request.Email, ct))
             return Result<UserDto>.Failure(Error.Conflict("Email already taken"));
 
         // Check if username is already taken
-        if (await _context.Users.AnyAsync(u => u.Username == request.Username, ct))
+        if (await context.Users.AnyAsync(u => u.Username == request.Username, ct))
             return Result<UserDto>.Failure(Error.Conflict("Username already taken"));
 
         try
@@ -49,14 +41,14 @@ public sealed class UserService : IUserService
                 Locale = request.Locale ?? "en-US"
             };
 
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync(ct);
+            context.Users.Add(user);
+            await context.SaveChangesAsync(ct);
 
             return Result<UserDto>.Success(user.ToDto());
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create user with email {Email}", request.Email);
+            logger.LogError(ex, "Failed to create user with email {Email}", request.Email);
             return Result<UserDto>.Failure(Error.Internal("Failed to create user"));
         }
     }
@@ -66,7 +58,7 @@ public sealed class UserService : IUserService
         UpdateUserRequest request,
         CancellationToken ct = default)
     {
-        var user = await _context.Users.FindAsync([userId], ct);
+        var user = await context.Users.FindAsync([userId], ct);
         if (user is null)
             return Result<UserDto>.Failure(Error.NotFound("User not found"));
 
@@ -75,7 +67,7 @@ public sealed class UserService : IUserService
             // Check username uniqueness if changed
             if (request.Username is not null && request.Username != user.Username)
             {
-                if (await _context.Users.AnyAsync(u => u.Username == request.Username, ct))
+                if (await context.Users.AnyAsync(u => u.Username == request.Username, ct))
                     return Result<UserDto>.Failure(Error.Conflict("Username already taken"));
 
                 user.Username = request.Username;
@@ -99,13 +91,13 @@ public sealed class UserService : IUserService
 
             user.UpdatedAt = DateTime.UtcNow;
 
-            await _context.SaveChangesAsync(ct);
+            await context.SaveChangesAsync(ct);
 
             return Result<UserDto>.Success(user.ToDto());
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to update user {UserId}", userId);
+            logger.LogError(ex, "Failed to update user {UserId}", userId);
             return Result<UserDto>.Failure(Error.Internal("Failed to update user"));
         }
     }
@@ -114,20 +106,20 @@ public sealed class UserService : IUserService
         Guid userId,
         CancellationToken ct = default)
     {
-        var user = await _context.Users.FindAsync([userId], ct);
+        var user = await context.Users.FindAsync([userId], ct);
         if (user is null)
             return Result<bool>.Success(true); // Already deleted
 
         try
         {
-            _context.Users.Remove(user);
-            await _context.SaveChangesAsync(ct);
+            context.Users.Remove(user);
+            await context.SaveChangesAsync(ct);
 
             return Result<bool>.Success(true);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to delete user {UserId}", userId);
+            logger.LogError(ex, "Failed to delete user {UserId}", userId);
             return Result<bool>.Failure(Error.Internal("Failed to delete user"));
         }
     }
@@ -136,7 +128,7 @@ public sealed class UserService : IUserService
         Guid userId,
         CancellationToken ct = default)
     {
-        var user = await _context.Users.FindAsync([userId], ct);
+        var user = await context.Users.FindAsync([userId], ct);
         if (user is null)
             return Result<UserDto>.Failure(Error.NotFound("User not found"));
 
@@ -147,7 +139,7 @@ public sealed class UserService : IUserService
         string email,
         CancellationToken ct = default)
     {
-        var user = await _context.Users
+        var user = await context.Users
             .FirstOrDefaultAsync(u => u.Email == email, ct);
 
         if (user is null)
@@ -160,7 +152,7 @@ public sealed class UserService : IUserService
         string username,
         CancellationToken ct = default)
     {
-        var user = await _context.Users
+        var user = await context.Users
             .FirstOrDefaultAsync(u => u.Username == username, ct);
 
         if (user is null)
@@ -180,7 +172,7 @@ public sealed class UserService : IUserService
             Iterations = _securitySettings.PasswordHashingIterations
         };
 
-        var user = await _context.Users.FindAsync([userId], ct);
+        var user = await context.Users.FindAsync([userId], ct);
         if (user is null)
             return Result<bool>.Failure(Error.NotFound("User not found"));
 
@@ -193,13 +185,13 @@ public sealed class UserService : IUserService
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
             user.UpdatedAt = DateTime.UtcNow;
 
-            await _context.SaveChangesAsync(ct);
+            await context.SaveChangesAsync(ct);
 
             return Result<bool>.Success(true);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to change password for user {UserId}", userId);
+            logger.LogError(ex, "Failed to change password for user {UserId}", userId);
             return Result<bool>.Failure(Error.Internal("Failed to change password"));
         }
     }
@@ -208,7 +200,7 @@ public sealed class UserService : IUserService
         string email,
         CancellationToken ct = default)
     {
-        var user = await _context.Users
+        var user = await context.Users
             .FirstOrDefaultAsync(u => u.Email == email, ct);
 
         if (user is null)
@@ -222,7 +214,7 @@ public sealed class UserService : IUserService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to request password reset for user {Email}", email);
+            logger.LogError(ex, "Failed to request password reset for user {Email}", email);
             return Result<bool>.Failure(Error.Internal("Failed to request password reset"));
         }
     }
@@ -233,7 +225,7 @@ public sealed class UserService : IUserService
         string newPassword,
         CancellationToken ct = default)
     {
-        var user = await _context.Users
+        var user = await context.Users
             .FirstOrDefaultAsync(u => u.Email == email, ct);
 
         if (user is null)
@@ -245,14 +237,41 @@ public sealed class UserService : IUserService
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
             user.UpdatedAt = DateTime.UtcNow;
 
-            await _context.SaveChangesAsync(ct);
+            await context.SaveChangesAsync(ct);
 
             return Result<bool>.Success(true);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to reset password for user {Email}", email);
+            logger.LogError(ex, "Failed to reset password for user {Email}", email);
             return Result<bool>.Failure(Error.Internal("Failed to reset password"));
         }
+    }
+
+    private string HashPassword(string password)
+    {
+        return BCrypt.Net.BCrypt.HashPassword(
+            password,
+            workFactor: _securitySettings.PasswordHashingIterations);
+    }
+
+    private bool ValidatePassword(string password)
+    {
+        if (password.Length < _securitySettings.MinPasswordLength)
+            return false;
+
+        if (_securitySettings.RequireUppercase && !password.Any(char.IsUpper))
+            return false;
+
+        if (_securitySettings.RequireLowercase && !password.Any(char.IsLower))
+            return false;
+
+        if (_securitySettings.RequireDigit && !password.Any(char.IsDigit))
+            return false;
+
+        if (_securitySettings.RequireSpecialChar && !password.Any(c => !char.IsLetterOrDigit(c)))
+            return false;
+
+        return true;
     }
 }

@@ -10,6 +10,7 @@ public sealed class DirectMessage
     public required byte[] Content { get; set; }
     public ContentType ContentType { get; set; } = ContentType.Text;
     public DateTime SentAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public bool IsDeleted { get; set; }
     public required byte[] MessageNonce { get; set; }
     public int KeyVersion { get; set; } = 1;

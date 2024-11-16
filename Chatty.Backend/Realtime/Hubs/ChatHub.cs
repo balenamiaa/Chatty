@@ -13,58 +13,56 @@ using Chatty.Shared.Models.Common;
 using Microsoft.AspNetCore.Authorization;
 using System.Runtime.CompilerServices;
 using Chatty.Backend.Services.Channels;
+using Chatty.Backend.Services.Servers;
+using Chatty.Shared.Models.Messages;
+using Chatty.Shared.Models.Notifications;
+using Chatty.Backend.Data;
+using Chatty.Backend.Data.Models;
+using Chatty.Backend.Data.Models.Extensions;
+using Microsoft.EntityFrameworkCore;
+using FluentValidation;
+using System.Text.Json;
 
 namespace Chatty.Backend.Realtime.Hubs;
 
 [Authorize]
-public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
+public sealed class ChatHub(
+    ILogger<ChatHub> logger,
+    IPresenceService presenceService,
+    IVoiceService voiceService,
+    IConnectionTracker connectionTracker,
+    IMessageService messageService,
+    ITypingTracker typingTracker,
+    IEventBus eventBus,
+    IChannelService channelService,
+    IServerService serverService,
+    ChattyDbContext context,
+    IValidator<NotificationPreferences> notificationSettingsValidator)
+    : Hub<IChatHubClient>, IChatHub
 {
-    private readonly ILogger<ChatHub> _logger;
-    private readonly IPresenceService _presenceService;
-    private readonly IVoiceService _voiceService;
-    private readonly IConnectionTracker _connectionTracker;
-    private readonly IMessageService _messageService;
-    private readonly ITypingTracker _typingTracker;
-    private readonly IEventBus _eventBus;
-    private readonly IChannelService _channelService;
-
-    public ChatHub(
-        ILogger<ChatHub> logger,
-        IPresenceService presenceService,
-        IVoiceService voiceService,
-        IConnectionTracker connectionTracker,
-        IMessageService messageService,
-        ITypingTracker typingTracker,
-        IEventBus eventBus,
-        IChannelService channelService)
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        _logger = logger;
-        _presenceService = presenceService;
-        _voiceService = voiceService;
-        _connectionTracker = connectionTracker;
-        _messageService = messageService;
-        _typingTracker = typingTracker;
-        _eventBus = eventBus;
-        _channelService = channelService;
-    }
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
 
     public override async Task OnConnectedAsync()
     {
         try
         {
             var userId = GetUserId();
-            await _connectionTracker.AddConnectionAsync(userId, Context.ConnectionId);
-            await _presenceService.UpdateLastSeenAsync(userId);
-            await _eventBus.PublishAsync(new OnlineStateEvent(userId, true));
+            await connectionTracker.AddConnectionAsync(userId, Context.ConnectionId);
+            await presenceService.UpdateLastSeenAsync(userId);
+            await eventBus.PublishAsync(new OnlineStateEvent(userId, true));
 
-            _logger.LogInformation("User {UserId} connected with connection {ConnectionId}",
+            logger.LogInformation("User {UserId} connected with connection {ConnectionId}",
                 userId, Context.ConnectionId);
 
             await base.OnConnectedAsync();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in OnConnectedAsync");
+            logger.LogError(ex, "Error in OnConnectedAsync");
             throw new HubException(HubError.ConnectionError("Failed to establish connection").Message);
         }
     }
@@ -74,22 +72,22 @@ public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
         try
         {
             var userId = GetUserId();
-            await _connectionTracker.RemoveConnectionAsync(userId, Context.ConnectionId);
-            await _presenceService.UpdateLastSeenAsync(userId);
+            await connectionTracker.RemoveConnectionAsync(userId, Context.ConnectionId);
+            await presenceService.UpdateLastSeenAsync(userId);
 
-            if (!await _connectionTracker.IsOnlineAsync(userId))
+            if (!await connectionTracker.IsOnlineAsync(userId))
             {
-                await _eventBus.PublishAsync(new OnlineStateEvent(userId, false));
+                await eventBus.PublishAsync(new OnlineStateEvent(userId, false));
             }
 
-            _logger.LogInformation("User {UserId} disconnected from {ConnectionId}",
+            logger.LogInformation("User {UserId} disconnected from {ConnectionId}",
                 userId, Context.ConnectionId);
 
             await base.OnDisconnectedAsync(exception);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in OnDisconnectedAsync");
+            logger.LogError(ex, "Error in OnDisconnectedAsync");
             throw new HubException(HubError.ConnectionError("Failed to handle disconnection").Message);
         }
     }
@@ -103,10 +101,15 @@ public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
             var result = await action();
             if (result.IsFailure)
             {
-                _logger.LogWarning("Hub method {Method} failed: {Error}",
+                logger.LogWarning("Hub method {Method} failed: {Error}",
                     methodName, result.Error.Message);
                 throw new HubException(result.Error.Message);
             }
+        }
+        catch (JsonException ex)
+        {
+            logger.LogError(ex, "Serialization error in hub method {Method}", methodName);
+            throw new HubException("Invalid message format");
         }
         catch (HubException)
         {
@@ -114,7 +117,7 @@ public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error executing hub method {Method}", methodName);
+            logger.LogError(ex, "Error executing hub method {Method}", methodName);
             throw new HubException(HubError.Internal($"Failed to execute {methodName}").Message);
         }
     }
@@ -126,13 +129,13 @@ public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
             var userId = GetUserId();
 
             // Validate channel access
-            var channel = await _channelService.GetAsync(channelId);
+            var channel = await channelService.GetAsync(channelId);
             if (channel.IsFailure)
             {
                 return Result<bool>.Failure(Error.NotFound("Channel not found"));
             }
 
-            var canAccess = await _channelService.CanAccessAsync(userId, channelId);
+            var canAccess = await channelService.CanAccessAsync(userId, channelId);
             if (canAccess.IsFailure || !canAccess.Value)
             {
                 return Result<bool>.Failure(Error.Forbidden("Cannot access channel"));
@@ -150,20 +153,20 @@ public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
             var userId = GetUserId();
 
             // Validate and rate limit
-            var canAccess = await _channelService.CanAccessAsync(userId, channelId);
+            var canAccess = await channelService.CanAccessAsync(userId, channelId);
             if (canAccess.IsFailure || !canAccess.Value)
             {
                 return Result<bool>.Failure(Error.Forbidden("Cannot access channel"));
             }
 
-            if (await _typingTracker.IsRateLimitedAsync(userId))
+            if (await typingTracker.IsRateLimitedAsync(userId))
             {
                 return Result<bool>.Failure(Error.TooManyRequests("Too many typing indicators"));
             }
 
-            await _typingTracker.TrackTypingAsync(channelId, userId);
-            var user = await GetUserDtoAsync(userId);
-            await _eventBus.PublishAsync(new TypingEvent(channelId, user, true));
+            await typingTracker.TrackTypingAsync(channelId, userId);
+            var userDto = await GetUserDtoAsync(userId);
+            await eventBus.PublishAsync(new TypingEvent(channelId, userDto, true));
 
             return Result<bool>.Success(true);
         });
@@ -176,7 +179,7 @@ public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
             var userId = GetUserId();
 
             // Validate channel access
-            var channel = await _channelService.GetAsync(channelId);
+            var channel = await channelService.GetAsync(channelId);
             if (channel.IsFailure)
             {
                 return Result<bool>.Failure(Error.NotFound("Channel not found"));
@@ -192,8 +195,8 @@ public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
-            var user = await GetUserDtoAsync(userId);
-            await _eventBus.PublishAsync(new TypingEvent(channelId, user, false));
+            var userDto = await GetUserDtoAsync(userId);
+            await eventBus.PublishAsync(new TypingEvent(channelId, userDto, false));
             return Result<bool>.Success(true);
         });
     }
@@ -204,14 +207,14 @@ public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
         {
             var userId = GetUserId();
 
-            if (await _typingTracker.IsRateLimitedAsync(userId))
+            if (await typingTracker.IsRateLimitedAsync(userId))
             {
                 return Result<bool>.Failure(Error.TooManyRequests("Too many typing indicators"));
             }
 
-            await _typingTracker.TrackDirectTypingAsync(userId, recipientId);
-            var user = await GetUserDtoAsync(userId);
-            await _eventBus.PublishAsync(new DirectTypingEvent(recipientId, user, true));
+            await typingTracker.TrackDirectTypingAsync(userId, recipientId);
+            var userDto = await GetUserDtoAsync(userId);
+            await eventBus.PublishAsync(new DirectTypingEvent(recipientId, userDto, true));
 
             return Result<bool>.Success(true);
         });
@@ -222,8 +225,8 @@ public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
-            var user = await GetUserDtoAsync(userId);
-            await _eventBus.PublishAsync(new DirectTypingEvent(recipientId, user, false));
+            var userDto = await GetUserDtoAsync(userId);
+            await eventBus.PublishAsync(new DirectTypingEvent(recipientId, userDto, false));
             return Result<bool>.Success(true);
         });
     }
@@ -233,7 +236,7 @@ public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
-            var result = await _presenceService.UpdateStatusAsync(userId, status, statusMessage);
+            var result = await presenceService.UpdateStatusAsync(userId, status, statusMessage);
             return result;
         });
     }
@@ -243,7 +246,7 @@ public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
-            var result = await _voiceService.JoinCallAsync(callId, userId, withVideo);
+            var result = await voiceService.JoinCallAsync(callId, userId, withVideo);
 
             if (result.IsSuccess)
             {
@@ -259,7 +262,7 @@ public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
-            var result = await _voiceService.LeaveCallAsync(callId, userId);
+            var result = await voiceService.LeaveCallAsync(callId, userId);
 
             if (result.IsSuccess)
             {
@@ -275,7 +278,7 @@ public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
-            return await _voiceService.MuteParticipantAsync(callId, userId, muted);
+            return await voiceService.MuteParticipantAsync(callId, userId, muted);
         });
     }
 
@@ -284,7 +287,7 @@ public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
-            return await _voiceService.EnableVideoAsync(callId, userId, enabled);
+            return await voiceService.EnableVideoAsync(callId, userId, enabled);
         });
     }
 
@@ -295,7 +298,7 @@ public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
             var userId = GetUserId();
 
             // Validate that both users are in the call
-            var participants = await _voiceService.GetParticipantsAsync(callId);
+            var participants = await voiceService.GetParticipantsAsync(callId);
             if (participants.IsFailure)
             {
                 return Result<bool>.Failure(Error.NotFound("Call not found"));
@@ -310,14 +313,413 @@ public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
             }
 
             // Send the signaling message to the peer
-            var connections = await _connectionTracker.GetConnectionsAsync(peerId);
+            var connections = await connectionTracker.GetConnectionsAsync(peerId);
             if (connections.Count > 0)
             {
                 await Clients.Clients(connections)
-                    .OnSignalingMessage(callId, userId, type, data);
+                    .OnSignalingMessage(userId, type, data);
             }
 
             return Result<bool>.Success(true);
+        });
+    }
+
+    // Server member operations
+    public async Task JoinServerAsync(Guid serverId)
+    {
+        await ExecuteHubMethodAsync(async () =>
+        {
+            var userId = GetUserId();
+
+            // Verify server exists
+            var server = await serverService.GetAsync(serverId);
+            if (server.IsFailure)
+            {
+                return Result<bool>.Failure(Error.NotFound("Server not found"));
+            }
+
+            // Check if already a member
+            var isMember = await context.ServerMembers
+                .AnyAsync(m => m.ServerId == serverId && m.UserId == userId);
+            if (isMember)
+            {
+                return Result<bool>.Failure(Error.Conflict("Already a member of this server"));
+            }
+
+            var result = await serverService.AddMemberAsync(serverId, userId, null);
+            if (result.IsSuccess)
+            {
+                // Add to server group
+                await Groups.AddToGroupAsync(Context.ConnectionId, $"server_{serverId}");
+
+                // Get member details from server
+                var memberResult = await context.ServerMembers
+                    .Include(m => m.User)
+                    .Include(m => m.Role)
+                    .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
+
+                if (memberResult != null)
+                {
+                    // Publish member joined event
+                    await eventBus.PublishAsync(new ServerMemberJoinedEvent(serverId, memberResult.ToDto()));
+                }
+
+                return Result<bool>.Success(true);
+            }
+
+            return Result<bool>.Failure(result.Error);
+        });
+    }
+
+    public async Task LeaveServerAsync(Guid serverId)
+    {
+        await ExecuteHubMethodAsync(async () =>
+        {
+            var userId = GetUserId();
+
+            // Verify server exists and user is a member
+            var server = await serverService.GetAsync(serverId);
+            if (server.IsFailure)
+            {
+                return Result<bool>.Failure(Error.NotFound("Server not found"));
+            }
+
+            var isMember = await context.ServerMembers
+                .AnyAsync(m => m.ServerId == serverId && m.UserId == userId);
+            if (!isMember)
+            {
+                return Result<bool>.Failure(Error.NotFound("Not a member of this server"));
+            }
+
+            var result = await serverService.RemoveMemberAsync(serverId, userId);
+            if (result.IsSuccess)
+            {
+                // Remove from server group
+                await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"server_{serverId}");
+
+                // Remove from all server's channel groups
+                var channels = await channelService.GetForServerAsync(serverId);
+                if (channels.IsSuccess)
+                {
+                    foreach (var channel in channels.Value)
+                    {
+                        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"channel_{channel.Id}");
+                    }
+                }
+
+                // Publish member left event
+                var userDto = await GetUserDtoAsync(userId);
+                await eventBus.PublishAsync(new ServerMemberRemovedEvent(serverId, userDto));
+
+                return Result<bool>.Success(true);
+            }
+
+            return Result<bool>.Failure(result.Error);
+        });
+    }
+
+    public async Task UpdateMemberRoleAsync(Guid serverId, Guid userId, Guid roleId)
+    {
+        await ExecuteHubMethodAsync(async () =>
+        {
+            var currentUserId = GetUserId();
+
+            // Verify server exists
+            var server = await serverService.GetAsync(serverId);
+            if (server.IsFailure)
+            {
+                return Result<bool>.Failure(Error.NotFound("Server not found"));
+            }
+
+            // Verify role exists
+            var role = await context.ServerRoles
+                .FirstOrDefaultAsync(r => r.Id == roleId && r.ServerId == serverId);
+            if (role == null)
+            {
+                return Result<bool>.Failure(Error.NotFound("Role not found"));
+            }
+
+            // Verify current user has manage roles permission
+            var currentMember = await context.ServerMembers
+                .Include(m => m.Role)
+                .ThenInclude(r => r.Permissions)
+                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == currentUserId);
+
+            if (currentMember?.Role?.Permissions.Any(p => p.Permission == PermissionType.ManageRoles) != true)
+            {
+                return Result<bool>.Failure(Error.Forbidden("Missing required permission: ManageRoles"));
+            }
+
+            var result = await serverService.UpdateMemberRoleAsync(serverId, userId, roleId);
+            if (result.IsSuccess)
+            {
+                // Get updated member details
+                var member = await context.ServerMembers
+                    .Include(m => m.User)
+                    .Include(m => m.Role)
+                    .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == userId);
+
+                if (member != null)
+                {
+                    // Publish member updated event
+                    await eventBus.PublishAsync(new ServerMemberUpdatedEvent(serverId, member.ToDto()));
+                }
+
+                return Result<bool>.Success(true);
+            }
+
+            return Result<bool>.Failure(result.Error);
+        });
+    }
+
+    public async Task KickMemberAsync(Guid serverId, Guid userId)
+    {
+        await ExecuteHubMethodAsync(async () =>
+        {
+            var currentUserId = GetUserId();
+
+            // Verify server exists
+            var server = await serverService.GetAsync(serverId);
+            if (server.IsFailure)
+            {
+                return Result<bool>.Failure(Error.NotFound("Server not found"));
+            }
+
+            // Cannot kick yourself
+            if (userId == currentUserId)
+            {
+                return Result<bool>.Failure(Error.Validation("Cannot kick yourself"));
+            }
+
+            // Verify target user is a member
+            var isMember = await context.ServerMembers
+                .AnyAsync(m => m.ServerId == serverId && m.UserId == userId);
+            if (!isMember)
+            {
+                return Result<bool>.Failure(Error.NotFound("User is not a member of this server"));
+            }
+
+            // Verify current user has kick members permission
+            var currentMember = await context.ServerMembers
+                .Include(m => m.Role)
+                .ThenInclude(r => r.Permissions)
+                .FirstOrDefaultAsync(m => m.ServerId == serverId && m.UserId == currentUserId);
+
+            if (currentMember?.Role?.Permissions.Any(p => p.Permission == PermissionType.KickMembers) != true)
+            {
+                return Result<bool>.Failure(Error.Forbidden("Missing required permission: KickMembers"));
+            }
+
+            var result = await serverService.RemoveMemberAsync(serverId, userId);
+            if (result.IsSuccess)
+            {
+                // Publish member removed event
+                var userDto = await GetUserDtoAsync(userId);
+                await eventBus.PublishAsync(new ServerMemberRemovedEvent(serverId, userDto));
+
+                return Result<bool>.Success(true);
+            }
+
+            return Result<bool>.Failure(result.Error);
+        });
+    }
+
+    // Notification operations
+    public async Task SubscribeToNotificationsAsync(string deviceToken, DeviceType deviceType)
+    {
+        await ExecuteHubMethodAsync(async () =>
+        {
+            var userId = GetUserId();
+
+            if (string.IsNullOrEmpty(deviceToken))
+            {
+                return Result<bool>.Failure(Error.Validation("Device token is required"));
+            }
+
+            // Register or update device
+            var device = await context.UserDevices
+                .FirstOrDefaultAsync(d => d.DeviceToken == deviceToken);
+
+            if (device == null)
+            {
+                device = new UserDevice
+                {
+                    UserId = userId,
+                    DeviceId = Guid.NewGuid(),
+                    DeviceToken = deviceToken,
+                    DeviceType = deviceType,
+                    PublicKey = Array.Empty<byte>(), // Should be set by client
+                    CreatedAt = DateTime.UtcNow
+                };
+                context.UserDevices.Add(device);
+            }
+            else if (device.UserId != userId)
+            {
+                return Result<bool>.Failure(Error.Forbidden("Device token belongs to another user"));
+            }
+            else
+            {
+                device.DeviceType = deviceType;
+                device.LastActiveAt = DateTime.UtcNow;
+            }
+
+            await context.SaveChangesAsync();
+            return Result<bool>.Success(true);
+        });
+    }
+
+    public async Task UnsubscribeFromNotificationsAsync(string deviceToken)
+    {
+        await ExecuteHubMethodAsync(async () =>
+        {
+            var userId = GetUserId();
+
+            if (string.IsNullOrEmpty(deviceToken))
+            {
+                return Result<bool>.Failure(Error.Validation("Device token is required"));
+            }
+
+            // Remove device registration
+            var device = await context.UserDevices
+                .FirstOrDefaultAsync(d => d.DeviceToken == deviceToken);
+
+            if (device != null)
+            {
+                if (device.UserId != userId)
+                {
+                    return Result<bool>.Failure(Error.Forbidden("Device token belongs to another user"));
+                }
+
+                context.UserDevices.Remove(device);
+                await context.SaveChangesAsync();
+            }
+
+            return Result<bool>.Success(true);
+        });
+    }
+
+    public async Task UpdateNotificationPreferencesAsync(NotificationPreferences preferences)
+    {
+        await ExecuteHubMethodAsync(async () =>
+        {
+            var userId = GetUserId();
+
+            // Validate settings
+            var validationResult = await notificationSettingsValidator.ValidateAsync(preferences);
+            if (!validationResult.IsValid)
+            {
+                return Result<bool>.Failure(Error.Validation(
+                    string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage))));
+            }
+
+            // Update user notification settings
+            var user = await context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                return Result<bool>.Failure(Error.NotFound("User not found"));
+            }
+
+            user.NotificationPreferences = preferences;
+            user.LastOnlineAt = DateTime.UtcNow;
+
+            await context.SaveChangesAsync();
+            return Result<bool>.Success(true);
+        });
+    }
+
+    public async Task SendMessageAsync(CreateMessageRequest request)
+    {
+        await ExecuteHubMethodAsync(async () =>
+        {
+            var userId = GetUserId();
+            var result = await messageService.CreateAsync(userId, request);
+            if (result.IsSuccess)
+            {
+                // The message event will be published through the event bus
+                return Result<bool>.Success(true);
+            }
+
+            return Result<bool>.Failure(result.Error);
+        });
+    }
+
+    public async Task UpdateMessageAsync(Guid messageId, UpdateMessageRequest request)
+    {
+        await ExecuteHubMethodAsync(async () =>
+        {
+            var userId = GetUserId();
+            var result = await messageService.UpdateAsync(messageId, userId, request);
+            if (result.IsSuccess)
+            {
+                // The message update event will be published through the event bus
+                return Result<bool>.Success(true);
+            }
+
+            return Result<bool>.Failure(result.Error);
+        });
+    }
+
+    public async Task DeleteMessageAsync(Guid messageId)
+    {
+        await ExecuteHubMethodAsync(async () =>
+        {
+            var userId = GetUserId();
+            var result = await messageService.DeleteAsync(messageId, userId);
+            if (result.IsSuccess)
+            {
+                // The message delete event will be published through the event bus
+                return Result<bool>.Success(true);
+            }
+
+            return Result<bool>.Failure(result.Error);
+        });
+    }
+
+    public async Task SendDirectMessageAsync(CreateDirectMessageRequest request)
+    {
+        await ExecuteHubMethodAsync(async () =>
+        {
+            var userId = GetUserId();
+            var result = await messageService.CreateDirectAsync(userId, request);
+            if (result.IsSuccess)
+            {
+                // The direct message event will be published through the event bus
+                return Result<bool>.Success(true);
+            }
+
+            return Result<bool>.Failure(result.Error);
+        });
+    }
+
+    public async Task UpdateDirectMessageAsync(Guid messageId, UpdateDirectMessageRequest request)
+    {
+        await ExecuteHubMethodAsync(async () =>
+        {
+            var userId = GetUserId();
+            var result = await messageService.UpdateDirectAsync(messageId, userId, request);
+            if (result.IsSuccess)
+            {
+                // The direct message update event will be published through the event bus
+                return Result<bool>.Success(true);
+            }
+
+            return Result<bool>.Failure(result.Error);
+        });
+    }
+
+    public async Task DeleteDirectMessageAsync(Guid messageId)
+    {
+        await ExecuteHubMethodAsync(async () =>
+        {
+            var userId = GetUserId();
+            var result = await messageService.DeleteDirectAsync(messageId, userId);
+            if (result.IsSuccess)
+            {
+                // The direct message delete event will be published through the event bus
+                return Result<bool>.Success(true);
+            }
+
+            return Result<bool>.Failure(result.Error);
         });
     }
 
@@ -326,7 +728,7 @@ public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
         var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (userId is null)
         {
-            _logger.LogWarning("Unauthorized hub access attempt");
+            logger.LogWarning("Unauthorized hub access attempt");
             throw new HubException(HubError.Unauthorized("User not authenticated").Message);
         }
 
@@ -335,18 +737,7 @@ public sealed class ChatHub : Hub<IChatHubClient>, IChatHub
 
     private async Task<UserDto> GetUserDtoAsync(Guid userId)
     {
-        var userService = Context.GetHttpContext()?.RequestServices.GetRequiredService<IUserService>();
-        if (userService is null)
-        {
-            throw new HubException(HubError.Internal("Service unavailable").Message);
-        }
-
-        var result = await userService.GetByIdAsync(userId);
-        if (result.IsFailure)
-        {
-            throw new HubException(HubError.NotFound($"User not found: {result.Error.Message}").Message);
-        }
-
-        return result.Value;
+        var user = await context.Users.FindAsync(userId);
+        return user?.ToDto() ?? throw new HubException(HubError.NotFound("User not found").Message);
     }
 }

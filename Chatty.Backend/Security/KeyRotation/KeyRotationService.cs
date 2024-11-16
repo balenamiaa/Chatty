@@ -30,16 +30,22 @@ public sealed class KeyRotationService(
 
     public async Task<(byte[] Key, int Version)> RotateKeyAsync(Guid userId, CancellationToken ct = default)
     {
-        var userKeys = _userKeys.GetOrAdd(userId, _ => new ConcurrentDictionary<int, byte[]>());
         var currentVersion = _currentVersions.GetOrAdd(userId, 1);
         var newVersion = currentVersion + 1;
-
-        // Generate new key
         var newKey = crypto.GenerateKey();
-        userKeys.TryAdd(newVersion, newKey);
-        _currentVersions.TryUpdate(userId, newVersion, currentVersion);
 
-        logger.LogInformation("Rotated key for user {UserId} to version {Version}", userId, newVersion);
+        // Store both old and new keys
+        var userKeys = _userKeys.GetOrAdd(userId, _ => new ConcurrentDictionary<int, byte[]>());
+        userKeys.TryAdd(newVersion, newKey);
+
+        // Keep last 3 versions
+        var oldVersions = userKeys.Keys.OrderByDescending(k => k).Skip(3);
+        foreach (var version in oldVersions)
+        {
+            userKeys.TryRemove(version, out _);
+        }
+
+        _currentVersions.TryUpdate(userId, newVersion, currentVersion);
 
         return (newKey, newVersion);
     }

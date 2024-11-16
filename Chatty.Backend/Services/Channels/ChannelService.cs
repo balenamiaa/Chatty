@@ -70,6 +70,15 @@ public sealed class ChannelService : IChannelService
             _context.Channels.Add(channel);
             await _context.SaveChangesAsync(ct);
 
+            // Load relationships for DTO
+            await _context.Entry(channel)
+                .Reference(c => c.Server)
+                .LoadAsync(ct);
+
+            await _context.Entry(channel)
+                .Collection(c => c.Members)
+                .LoadAsync(ct);
+
             var channelDto = channel.ToDto();
 
             // Publish channel created event
@@ -120,6 +129,15 @@ public sealed class ChannelService : IChannelService
             channel.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync(ct);
+
+            // Load relationships for DTO
+            await _context.Entry(channel)
+                .Reference(c => c.Server)
+                .LoadAsync(ct);
+
+            await _context.Entry(channel)
+                .Collection(c => c.Members)
+                .LoadAsync(ct);
 
             var channelDto = channel.ToDto();
 
@@ -177,7 +195,14 @@ public sealed class ChannelService : IChannelService
         if (channel is null)
             return Result<ChannelDto>.Failure(Error.NotFound("Channel not found"));
 
-        return Result<ChannelDto>.Success(channel.ToDto());
+        // Load relationships for DTO
+        await _context.Entry(channel)
+            .Reference(c => c.Server)
+            .LoadAsync(ct);
+
+        var channelDto = channel.ToDto();
+
+        return Result<ChannelDto>.Success(channelDto);
     }
 
     public async Task<Result<IReadOnlyList<ChannelDto>>> GetForServerAsync(
@@ -190,6 +215,14 @@ public sealed class ChannelService : IChannelService
             .Where(c => c.ServerId == serverId)
             .OrderBy(c => c.Position)
             .ToListAsync(ct);
+
+        foreach (var channel in channels)
+        {
+            // Load relationships for DTO
+            await _context.Entry(channel)
+                .Reference(c => c.Server)
+                .LoadAsync(ct);
+        }
 
         return Result<IReadOnlyList<ChannelDto>>.Success(
             channels.Select(c => c.ToDto()).ToList());
@@ -286,6 +319,11 @@ public sealed class ChannelService : IChannelService
             if (channel is null)
                 return Result<bool>.Failure(Error.NotFound("Channel not found"));
 
+            // Load relationships for DTO
+            await _context.Entry(channel)
+                .Reference(c => c.Server)
+                .LoadAsync(ct);
+
             // If channel is not private, anyone can access
             if (!channel.IsPrivate)
                 return Result<bool>.Success(true);
@@ -299,7 +337,7 @@ public sealed class ChannelService : IChannelService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to check channel access for user {UserId} in channel {ChannelId}", 
+            _logger.LogError(ex, "Failed to check channel access for user {UserId} in channel {ChannelId}",
                 userId, channelId);
             return Result<bool>.Failure(Error.Internal("Failed to check channel access"));
         }

@@ -1,11 +1,11 @@
+using System.Collections.Concurrent;
 using Chatty.Shared.Realtime.Events;
 
 namespace Chatty.Backend.Realtime.Events;
 
 public sealed class EventBus : IEventBus
 {
-    private readonly Dictionary<Type, List<Func<object, Task>>> _handlers = new();
-    private readonly Lock _lock = new();
+    private readonly ConcurrentDictionary<Type, ConcurrentBag<Func<object, Task>>> _handlers = new();
     private readonly ILogger<EventBus> _logger;
     private readonly IEventDispatcher _eventDispatcher;
 
@@ -22,32 +22,26 @@ public sealed class EventBus : IEventBus
         SubscribeToPresenceEvents();
     }
 
-    public Task PublishAsync<TEvent>(TEvent @event, CancellationToken ct = default)
+    public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken ct = default)
     {
         if (@event == null) throw new ArgumentNullException(nameof(@event));
 
         var eventType = typeof(TEvent);
-        List<Func<object, Task>>? handlers;
 
-        lock (_lock)
-        {
-            if (!_handlers.TryGetValue(eventType, out handlers))
-                return Task.CompletedTask;
-
-            handlers = handlers.ToList(); // Create a copy to avoid concurrent modification
-        }
+        if (!_handlers.TryGetValue(eventType, out var handlers))
+            return;
 
         var tasks = handlers.Select(handler =>
-            ExecuteHandler(handler, @event));
+            ExecuteHandlerAsync(handler, @event, ct));
 
-        return Task.WhenAll(tasks);
+        await Task.WhenAll(tasks);
     }
 
-    private async Task ExecuteHandler(Func<object, Task> handler, object @event)
+    private async Task ExecuteHandlerAsync(Func<object, Task> handler, object @event, CancellationToken ct)
     {
         try
         {
-            await handler(@event);
+            await handler(@event).WaitAsync(ct);
         }
         catch (Exception ex)
         {
@@ -58,34 +52,20 @@ public sealed class EventBus : IEventBus
     public IDisposable Subscribe<TEvent>(Func<TEvent, Task> handler)
     {
         var eventType = typeof(TEvent);
-
         async Task WrapperHandler(object e) => await handler((TEvent)e);
 
-        lock (_lock)
+        var handlers = _handlers.GetOrAdd(eventType, _ => new ConcurrentBag<Func<object, Task>>());
+        handlers.Add(WrapperHandler);
+
+        return new Subscription(() =>
         {
-            if (!_handlers.TryGetValue(eventType, out var handlers))
+            if (_handlers.TryGetValue(eventType, out var currentHandlers))
             {
-                handlers = new List<Func<object, Task>>();
-                _handlers[eventType] = handlers;
+                var updatedHandlers = new ConcurrentBag<Func<object, Task>>(
+                    currentHandlers.Where(h => h != WrapperHandler));
+                _handlers.TryUpdate(eventType, updatedHandlers, currentHandlers);
             }
-
-            handlers.Add(WrapperHandler);
-        }
-
-        return new Subscription(() => Unsubscribe(eventType, WrapperHandler));
-    }
-
-    private void Unsubscribe(Type eventType, Func<object, Task> handler)
-    {
-        lock (_lock)
-        {
-            if (_handlers.TryGetValue(eventType, out var handlers))
-            {
-                handlers.Remove(handler);
-                if (!handlers.Any())
-                    _handlers.Remove(eventType);
-            }
-        }
+        });
     }
 
     private void SubscribeToMessageEvents()

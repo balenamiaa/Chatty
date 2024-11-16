@@ -49,41 +49,5 @@ public sealed class MessageModule : ICarterModule
                     detail: result.Error.Message,
                     statusCode: StatusCodes.Status400BadRequest);
         });
-
-        // Delete channel message
-        group.MapDelete("/{messageId}", async (
-            Guid messageId,
-            IMessageService messageService,
-            ClaimsPrincipal user,
-            CancellationToken ct) =>
-        {
-            var userId = Guid.Parse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-            var result = await messageService.DeleteAsync(messageId, userId, ct);
-
-            return result.IsSuccess
-                ? Results.NoContent()
-                : Results.Problem(
-                    title: result.Error.Code,
-                    detail: result.Error.Message,
-                    statusCode: StatusCodes.Status400BadRequest);
-        });
-
-        // Delete direct message
-        group.MapDelete("/direct/{messageId}", async (
-            Guid messageId,
-            IMessageService messageService,
-            ClaimsPrincipal user,
-            CancellationToken ct) =>
-        {
-            var userId = Guid.Parse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-            var result = await messageService.DeleteDirectAsync(messageId, userId, ct);
-
-            return result.IsSuccess
-                ? Results.NoContent()
-                : Results.Problem(
-                    title: result.Error.Code,
-                    detail: result.Error.Message,
-                    statusCode: StatusCodes.Status400BadRequest);
-        });
     }
 }

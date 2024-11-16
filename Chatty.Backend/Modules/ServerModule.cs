@@ -113,58 +113,5 @@ public sealed class ServerModule : ICarterModule
                     detail: result.Error.Message,
                     statusCode: StatusCodes.Status400BadRequest);
         });
-
-        // Add member
-        group.MapPost("/{serverId}/members/{userId}", async (
-            Guid serverId,
-            Guid userId,
-            [FromQuery] Guid? roleId,
-            IServerService serverService,
-            CancellationToken ct) =>
-        {
-            var result = await serverService.AddMemberAsync(serverId, userId, roleId, ct);
-
-            return result.IsSuccess
-                ? Results.NoContent()
-                : Results.Problem(
-                    title: result.Error.Code,
-                    detail: result.Error.Message,
-                    statusCode: StatusCodes.Status400BadRequest);
-        });
-
-        // Remove member
-        group.MapDelete("/{serverId}/members/{userId}", async (
-            Guid serverId,
-            Guid userId,
-            IServerService serverService,
-            CancellationToken ct) =>
-        {
-            var result = await serverService.RemoveMemberAsync(serverId, userId, ct);
-
-            return result.IsSuccess
-                ? Results.NoContent()
-                : Results.Problem(
-                    title: result.Error.Code,
-                    detail: result.Error.Message,
-                    statusCode: StatusCodes.Status400BadRequest);
-        });
-
-        // Update member role
-        group.MapPut("/{serverId}/members/{userId}/role", async (
-            Guid serverId,
-            Guid userId,
-            [FromBody] Guid roleId,
-            IServerService serverService,
-            CancellationToken ct) =>
-        {
-            var result = await serverService.UpdateMemberRoleAsync(serverId, userId, roleId, ct);
-
-            return result.IsSuccess
-                ? Results.NoContent()
-                : Results.Problem(
-                    title: result.Error.Code,
-                    detail: result.Error.Message,
-                    statusCode: StatusCodes.Status400BadRequest);
-        });
     }
 }
