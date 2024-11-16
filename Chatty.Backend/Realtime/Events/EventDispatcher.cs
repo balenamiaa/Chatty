@@ -6,6 +6,7 @@ using Chatty.Shared.Models.Messages;
 using Chatty.Shared.Models.Servers;
 using Chatty.Shared.Models.Users;
 using Chatty.Shared.Realtime.Hubs;
+
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
@@ -389,6 +390,78 @@ public sealed class EventDispatcher(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to dispatch signaling message");
+        }
+    }
+
+    public async Task DispatchMessageReactionAddedAsync(Guid channelId, Guid messageId, MessageReactionDto reaction)
+    {
+        try
+        {
+            await hubContext.Clients
+                .Group($"channel_{channelId}")
+                .OnMessageReactionAdded(channelId, messageId, reaction);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to dispatch message reaction added event");
+        }
+    }
+
+    public async Task DispatchMessageReactionRemovedAsync(Guid channelId, Guid messageId, Guid reactionId, Guid userId)
+    {
+        try
+        {
+            await hubContext.Clients
+                .Group($"channel_{channelId}")
+                .OnMessageReactionRemoved(channelId, messageId, reactionId, userId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to dispatch message reaction removed event");
+        }
+    }
+
+    public async Task DispatchDirectMessageReactionAddedAsync(Guid messageId, MessageReactionDto reaction)
+    {
+        try
+        {
+            var directMessage = await context.DirectMessages
+                .FirstOrDefaultAsync(m => m.Id == messageId);
+
+            if (directMessage is not null)
+            {
+                await DispatchToUserAsync(directMessage.SenderId, client =>
+                    client.OnDirectMessageReactionAdded(messageId, reaction));
+
+                await DispatchToUserAsync(directMessage.RecipientId, client =>
+                    client.OnDirectMessageReactionAdded(messageId, reaction));
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to dispatch direct message reaction added event");
+        }
+    }
+
+    public async Task DispatchDirectMessageReactionRemovedAsync(Guid messageId, Guid reactionId, Guid userId)
+    {
+        try
+        {
+            var directMessage = await context.DirectMessages
+                .FirstOrDefaultAsync(m => m.Id == messageId);
+
+            if (directMessage is not null)
+            {
+                await DispatchToUserAsync(directMessage.SenderId, client =>
+                    client.OnDirectMessageReactionRemoved(messageId, reactionId, userId));
+
+                await DispatchToUserAsync(directMessage.RecipientId, client =>
+                    client.OnDirectMessageReactionRemoved(messageId, reactionId, userId));
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to dispatch direct message reaction removed event");
         }
     }
 

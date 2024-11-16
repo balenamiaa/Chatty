@@ -1,4 +1,5 @@
 using System.Security.Claims;
+
 using Chatty.Backend.Data;
 using Chatty.Backend.Data.Models;
 using Chatty.Backend.Data.Models.Extensions;
@@ -17,10 +18,14 @@ using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Models.Notifications;
 using Chatty.Shared.Realtime.Events;
 using Chatty.Shared.Realtime.Hubs;
+
 using FluentValidation;
+
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
+
 using Moq;
+
 using Xunit;
 
 namespace Chatty.Backend.Tests.Realtime.Hubs;

@@ -6,9 +6,12 @@ using Chatty.Backend.Services.Presence;
 using Chatty.Backend.Tests.Helpers;
 using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Realtime.Events;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+
 using Moq;
+
 using Xunit;
 
 namespace Chatty.Backend.Tests.Services.Presence;

@@ -1,7 +1,9 @@
-using System.Net.Mime;
-using Chatty.Shared.Models.Enums;
-using ContentType = Chatty.Shared.Models.Enums.ContentType;
 using System.Collections.Generic;
+using System.Net.Mime;
+
+using Chatty.Shared.Models.Enums;
+
+using ContentType = Chatty.Shared.Models.Enums.ContentType;
 
 namespace Chatty.Shared.Models.Messages;
 

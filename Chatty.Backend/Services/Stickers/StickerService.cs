@@ -4,7 +4,9 @@ using Chatty.Backend.Realtime.Events;
 using Chatty.Shared.Models.Common;
 using Chatty.Shared.Models.Stickers;
 using Chatty.Shared.Realtime.Events;
+
 using Microsoft.EntityFrameworkCore;
+
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
 

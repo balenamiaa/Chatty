@@ -1,19 +1,17 @@
 using Chatty.Backend.Data;
-using Chatty.Backend.Services.Auth;
-using Chatty.Backend.Services.Presence;
-using Microsoft.EntityFrameworkCore;
-using FluentValidation;
 using Chatty.Backend.Infrastructure.Configuration;
 using Chatty.Backend.Realtime;
 using Chatty.Backend.Realtime.Events;
 using Chatty.Backend.Security.DeviceVerification;
 using Chatty.Backend.Security.KeyBackup;
 using Chatty.Backend.Security.KeyRotation;
+using Chatty.Backend.Services.Auth;
 using Chatty.Backend.Services.Background;
 using Chatty.Backend.Services.Channels;
 using Chatty.Backend.Services.Contacts;
 using Chatty.Backend.Services.Files;
 using Chatty.Backend.Services.Messages;
+using Chatty.Backend.Services.Presence;
 using Chatty.Backend.Services.Servers;
 using Chatty.Backend.Services.Stickers;
 using Chatty.Backend.Services.Users;
@@ -22,6 +20,10 @@ using Chatty.Shared.Crypto;
 using Chatty.Shared.Crypto.KeyExchange;
 using Chatty.Shared.Crypto.Session;
 using Chatty.Shared.Models.Validation;
+
+using FluentValidation;
+
+using Microsoft.EntityFrameworkCore;
 
 namespace Chatty.Backend.Infrastructure;
 

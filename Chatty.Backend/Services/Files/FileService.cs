@@ -1,14 +1,17 @@
+using System.Text;
+
 using Chatty.Backend.Data;
 using Chatty.Backend.Data.Models;
-using Chatty.Shared.Models.Attachments;
-using Chatty.Shared.Models.Common;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Processing;
 using Chatty.Backend.Data.Models.Extensions;
 using Chatty.Backend.Infrastructure.Configuration;
+using Chatty.Shared.Models.Attachments;
+using Chatty.Shared.Models.Common;
 using Chatty.Shared.Models.Enums;
+
 using Microsoft.Extensions.Options;
-using System.Text;
+
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
 
 namespace Chatty.Backend.Services.Files;
 

@@ -5,11 +5,14 @@ using Chatty.Backend.Tests.Helpers;
 using Chatty.Shared.Crypto;
 using Chatty.Shared.Models.Auth;
 using Chatty.Shared.Models.Enums;
+
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+
 using Moq;
+
 using Xunit;
 
 namespace Chatty.Backend.Tests.Services.Auth;

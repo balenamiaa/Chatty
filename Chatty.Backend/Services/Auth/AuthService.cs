@@ -1,15 +1,18 @@
+using System.Collections.Concurrent;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+
 using Chatty.Backend.Data;
 using Chatty.Backend.Data.Models;
 using Chatty.Shared.Models.Auth;
 using Chatty.Shared.Models.Common;
 using Chatty.Shared.Models.Enums;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.Collections.Concurrent;
+
 using ICryptoProvider = Chatty.Shared.Crypto.ICryptoProvider;
 
 namespace Chatty.Backend.Services.Auth;

@@ -1,11 +1,12 @@
 using Chatty.Backend.Data;
 using Chatty.Backend.Data.Models;
 using Chatty.Backend.Infrastructure.Configuration;
+using Chatty.Backend.Security.Hashing;
 using Chatty.Shared.Models.Common;
 using Chatty.Shared.Models.Users;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Chatty.Backend.Security.Hashing;
 
 namespace Chatty.Backend.Services.Users;
 

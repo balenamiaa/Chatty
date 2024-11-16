@@ -1,10 +1,12 @@
 using System.Collections.Concurrent;
+
 using Chatty.Backend.Data;
 using Chatty.Backend.Realtime;
 using Chatty.Backend.Realtime.Events;
 using Chatty.Shared.Models.Common;
 using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Realtime.Events;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace Chatty.Backend.Services.Presence;
@@ -197,7 +199,7 @@ public sealed class PresenceService(
         {
             foreach (var userId in userIds)
             {
-                var subscribers = _subscriptions.GetOrAdd(userId, _ => new HashSet<Guid>());
+                var subscribers = _subscriptions.GetOrAdd(userId, _ => []);
                 lock (subscribers)
                 {
                     subscribers.Add(subscriberId);

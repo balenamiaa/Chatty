@@ -1,5 +1,6 @@
-using FluentValidation;
 using Chatty.Shared.Models.Calls;
+
+using FluentValidation;
 
 namespace Chatty.Shared.Models.Validation;
 

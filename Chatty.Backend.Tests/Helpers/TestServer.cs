@@ -1,35 +1,40 @@
+using System.Net.Http;
 using System.Security.Claims;
+using System.Text;
+using System.Threading;
+
 using Chatty.Backend.Data;
 using Chatty.Backend.Infrastructure.Configuration;
+using Chatty.Backend.Realtime;
 using Chatty.Backend.Realtime.Events;
 using Chatty.Backend.Realtime.Hubs;
+using Chatty.Backend.Services.Auth;
 using Chatty.Backend.Services.Channels;
+using Chatty.Backend.Services.Files;
 using Chatty.Backend.Services.Messages;
 using Chatty.Backend.Services.Presence;
-using Chatty.Backend.Services.Voice;
-using Chatty.Backend.Realtime;
 using Chatty.Backend.Services.Servers;
+using Chatty.Backend.Services.Voice;
+using Chatty.Shared.Crypto;
 using Chatty.Shared.Models.Common;
 using Chatty.Shared.Models.Notifications;
+
+using FluentValidation;
+
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using FluentValidation;
+
 using Moq;
-using System.Text;
-using System.Net.Http;
-using System.Threading;
-using Microsoft.AspNetCore.Http;
-using Chatty.Backend.Services.Auth;
-using Chatty.Backend.Services.Files;
-using Microsoft.Extensions.Configuration;
-using Chatty.Shared.Crypto;
+
 using ICryptoProvider = Chatty.Shared.Crypto.ICryptoProvider;
 
 namespace Chatty.Backend.Tests.Helpers;
@@ -51,9 +56,9 @@ public sealed class TestServer : IAsyncDisposable
         _ = builder.Services.AddSignalR(options =>
         {
             options.EnableDetailedErrors = true;
-            options.HandshakeTimeout = TimeSpan.FromSeconds(5);
-            options.KeepAliveInterval = TimeSpan.FromSeconds(2);
-            options.ClientTimeoutInterval = TimeSpan.FromSeconds(10);
+            options.HandshakeTimeout = TimeSpan.FromSeconds(2);
+            options.KeepAliveInterval = TimeSpan.FromSeconds(1);
+            options.ClientTimeoutInterval = TimeSpan.FromSeconds(3);
             options.MaximumParallelInvocationsPerClient = 2;
         }).AddHubOptions<ChatHub>(options =>
         {

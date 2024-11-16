@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
+
 using Moq;
 
 namespace Chatty.Backend.Tests.Helpers;

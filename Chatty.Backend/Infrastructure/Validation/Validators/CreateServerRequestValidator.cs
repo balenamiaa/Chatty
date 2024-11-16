@@ -1,18 +1,19 @@
-using FluentValidation;
 using Chatty.Shared.Models.Servers;
+
+using FluentValidation;
 
 namespace Chatty.Shared.Models.Validation;
 
-public sealed class UpdateServerRequestValidator : AbstractValidator<UpdateServerRequest>
+public sealed class CreateServerRequestValidator : AbstractValidator<CreateServerRequest>
 {
-    public UpdateServerRequestValidator()
+    public CreateServerRequestValidator()
     {
         RuleFor(x => x.Name)
+            .NotEmpty()
             .MinimumLength(2)
             .MaximumLength(100)
             .Matches(@"^[\w\s-]+$")
-            .WithMessage("Server name can only contain letters, numbers, spaces, and hyphens")
-            .When(x => !string.IsNullOrEmpty(x.Name));
+            .WithMessage("Server name can only contain letters, numbers, spaces, and hyphens");
 
         RuleFor(x => x.IconUrl)
             .Must(BeAValidUrl)

@@ -1,11 +1,30 @@
 using Chatty.Backend.Data;
 using Chatty.Backend.Data.Models;
+using Chatty.Backend.Infrastructure.Configuration;
 using Chatty.Shared.Models.Enums;
+
+using Microsoft.Extensions.Options;
 
 namespace Chatty.Backend.Tests.Helpers;
 
 public static class TestData
 {
+    public static class Settings
+    {
+        public static IOptions<LimitSettings> LimitSettings => Options.Create(new LimitSettings
+        {
+            MaxMessageLength = 1024,
+            RateLimits = new RateLimitSettings
+            {
+                Messages = new RateLimit
+                {
+                    Points = 10,
+                    DurationSeconds = 5 // Low for testing
+                }
+            }
+        });
+
+    }
     public static class Auth
     {
         public const string DefaultPassword = "password123";
@@ -34,6 +53,19 @@ public static class TestData
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(Auth.DefaultPassword),
             FirstName = "Test",
             LastName = "User2",
+            Locale = "en-US",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        public static User User3 => new()
+        {
+            Id = Guid.Parse("33333333-3333-3333-3333-333333333333"),
+            Username = "testuser3",
+            Email = "test3@example.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(Auth.DefaultPassword),
+            FirstName = "Test",
+            LastName = "User3",
             Locale = "en-US",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow

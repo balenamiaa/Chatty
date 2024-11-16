@@ -1,10 +1,11 @@
 using Chatty.Backend.Services.Common;
 using Chatty.Shared.Models.Common;
+using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Models.Messages;
 
 namespace Chatty.Backend.Services.Messages;
 
-public interface IMessageService : IService
+public interface IMessageService
 {
     Task<Result<MessageDto>> CreateAsync(Guid userId, CreateMessageRequest request, CancellationToken ct = default);
 
@@ -30,5 +31,41 @@ public interface IMessageService : IService
         Guid messageId,
         Guid userId,
         UpdateDirectMessageRequest request,
+        CancellationToken ct = default);
+
+    // Channel message reactions
+    Task<Result<MessageReactionDto>> AddChannelMessageReactionAsync(
+        Guid messageId,
+        Guid userId,
+        ReactionType type,
+        string? customEmoji = null,
+        CancellationToken ct = default);
+
+    Task<Result<bool>> RemoveChannelMessageReactionAsync(
+        Guid messageId,
+        Guid reactionId,
+        Guid userId,
+        CancellationToken ct = default);
+
+    Task<Result<IReadOnlyList<MessageReactionDto>>> GetChannelMessageReactionsAsync(
+        Guid messageId,
+        CancellationToken ct = default);
+
+    // Direct message reactions
+    Task<Result<MessageReactionDto>> AddDirectMessageReactionAsync(
+        Guid messageId,
+        Guid userId,
+        ReactionType type,
+        string? customEmoji = null,
+        CancellationToken ct = default);
+
+    Task<Result<bool>> RemoveDirectMessageReactionAsync(
+        Guid messageId,
+        Guid reactionId,
+        Guid userId,
+        CancellationToken ct = default);
+
+    Task<Result<IReadOnlyList<MessageReactionDto>>> GetDirectMessageReactionsAsync(
+        Guid messageId,
         CancellationToken ct = default);
 }

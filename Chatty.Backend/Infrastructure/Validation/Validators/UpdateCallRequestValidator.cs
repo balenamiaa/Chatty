@@ -1,6 +1,7 @@
-using FluentValidation;
 using Chatty.Shared.Models.Calls;
 using Chatty.Shared.Models.Enums;
+
+using FluentValidation;
 
 namespace Chatty.Shared.Models.Validation;
 

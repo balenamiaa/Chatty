@@ -1,24 +1,27 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text;
+using System.Threading;
+
 using Chatty.Backend.Data;
 using Chatty.Backend.Data.Models;
 using Chatty.Backend.Services.Messages;
 using Chatty.Backend.Tests.Helpers;
-using Chatty.Shared.Models.Messages;
 using Chatty.Shared.Models.Enums;
+using Chatty.Shared.Models.Messages;
+using Chatty.Shared.Models.Users;
+
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.AspNetCore.Http.Connections;
-using System.Text;
-using System.IdentityModel.Tokens.Jwt;
-using Microsoft.IdentityModel.Tokens;
-using Xunit;
 using Microsoft.Extensions.Logging;
-using Chatty.Shared.Models.Users;
-using System.Threading;
+using Microsoft.IdentityModel.Tokens;
+
+using Xunit;
 
 namespace Chatty.Backend.Tests.Realtime.Integration;
 
-public sealed class ChatHubIntegrationTests : IAsyncLifetime
+public sealed class ChatHubIntegrationTests : IAsyncLifetime, IAsyncDisposable
 {
     private readonly TestServer _server;
     private readonly ChattyDbContext _context;
@@ -192,19 +195,6 @@ public sealed class ChatHubIntegrationTests : IAsyncLifetime
         return tokenHandler.WriteToken(token);
     }
 
-    public async Task DisposeAsync()
-    {
-        if (_connection1 is not null)
-        {
-            await _connection1.DisposeAsync();
-        }
-        if (_connection2 is not null)
-        {
-            await _connection2.DisposeAsync();
-        }
-        await _server.DisposeAsync();
-    }
-
     [Fact]
     public async Task JoinChannel_BothUsersReceiveMessages()
     {
@@ -321,5 +311,35 @@ public sealed class ChatHubIntegrationTests : IAsyncLifetime
                 await _connection2.StopAsync();
             throw;
         }
+    }
+
+    private async Task Dispose()
+    {
+        if (_connection1 != null)
+        {
+            await _connection1.DisposeAsync();
+            _connection1 = null;
+        }
+        if (_connection2 != null)
+        {
+            await _connection2.DisposeAsync();
+            _connection2 = null;
+        }
+        if (_context != null)
+        {
+            await _context.Database.EnsureDeletedAsync();
+            await _context.DisposeAsync();
+        }
+        await _server.DisposeAsync();
+    }
+
+    async ValueTask IAsyncDisposable.DisposeAsync()
+    {
+        await Dispose();
+    }
+
+    public async Task DisposeAsync()
+    {
+        await Dispose();
     }
 }

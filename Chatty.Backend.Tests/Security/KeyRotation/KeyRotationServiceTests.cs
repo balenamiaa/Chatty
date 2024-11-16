@@ -1,7 +1,10 @@
 using Chatty.Backend.Security.KeyRotation;
 using Chatty.Shared.Crypto;
+
 using Microsoft.Extensions.Logging;
+
 using Moq;
+
 using Xunit;
 
 namespace Chatty.Backend.Tests.Security.KeyRotation;

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+
 using Chatty.Shared.Crypto;
 
 namespace Chatty.Backend.Security.KeyRotation;

@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 using Chatty.Backend.Data;
 using Chatty.Backend.Data.Models;
 using Chatty.Backend.Data.Models.Extensions;
@@ -6,15 +8,15 @@ using Chatty.Backend.Realtime.Events;
 using Chatty.Backend.Realtime.Hubs;
 using Chatty.Shared.Crypto;
 using Chatty.Shared.Models.Common;
+using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Models.Messages;
 using Chatty.Shared.Realtime.Events;
 using Chatty.Shared.Realtime.Hubs;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
+
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
-using System.Collections.Concurrent;
-using Chatty.Shared.Models.Enums;
+using Microsoft.Extensions.Options;
 
 namespace Chatty.Backend.Services.Messages;
 
@@ -360,9 +362,15 @@ public sealed class MessageService(
         if (message.SenderId != userId)
             return Result<MessageDto>.Failure(Error.Forbidden("Cannot edit another user's message"));
 
+        if (request.Content.Length > _limitSettings.MaxMessageLength)
+            return Result<MessageDto>.Failure(Error.Validation("Message content exceeds maximum length"));
+
         try
         {
             message.Content = request.Content;
+            message.ContentType = request.ContentType;
+            message.MessageNonce = request.MessageNonce;
+            message.KeyVersion = request.KeyVersion;
             message.UpdatedAt = DateTime.UtcNow;
             await context.SaveChangesAsync(ct);
 
@@ -424,5 +432,340 @@ public sealed class MessageService(
             _logger.LogError(ex, "Failed to update direct message {MessageId}", messageId);
             return Result<DirectMessageDto>.Failure(Error.Internal("Failed to update direct message"));
         }
+    }
+
+    public async Task<Result<MessageReactionDto>> AddChannelMessageReactionAsync(
+        Guid messageId,
+        Guid userId,
+        ReactionType type,
+        string? customEmoji = null,
+        CancellationToken ct = default)
+    {
+        // Validate custom emoji
+        if (type == ReactionType.Custom && string.IsNullOrWhiteSpace(customEmoji))
+            return Result<MessageReactionDto>.Failure(Error.Validation("Custom emoji is required for custom reactions"));
+
+        await using var context = await _contextFactory.CreateDbContextAsync(ct);
+
+        // Verify message exists and user has access
+        var message = await context.Messages
+            .Include(m => m.Channel)
+            .Include(m => m.Reactions)
+            .Include(m => m.Sender)
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(m => m.Id == messageId, ct);
+
+        if (message is null)
+            return Result<MessageReactionDto>.Failure(Error.NotFound("Message not found"));
+
+        if (message.IsDeleted)
+            return Result<MessageReactionDto>.Failure(Error.Forbidden("Cannot react to deleted messages"));
+
+        // Verify user is member of the channel
+        var isMember = await context.ChannelMembers
+            .AnyAsync(m => m.ChannelId == message.ChannelId && m.UserId == userId, ct);
+
+        if (!isMember)
+            return Result<MessageReactionDto>.Failure(Error.Forbidden("Cannot react to this message"));
+
+        // Verify not already reacted with same type
+        var existingReaction = await context.MessageReactions
+            .FirstOrDefaultAsync(r =>
+                r.ChannelMessageId == messageId &&
+                r.UserId == userId &&
+                r.Type == type &&
+                r.CustomEmoji == customEmoji, ct);
+
+        if (existingReaction is not null)
+            return Result<MessageReactionDto>.Failure(Error.Conflict("Already reacted with this reaction"));
+
+        try
+        {
+            var user = await context.Users.FindAsync(userId, ct);
+            if (user is null)
+                return Result<MessageReactionDto>.Failure(Error.NotFound("User not found"));
+
+            var reaction = new MessageReaction
+            {
+                ChannelMessageId = messageId,
+                UserId = userId,
+                Type = type,
+                CustomEmoji = customEmoji,
+                User = user
+            };
+
+            context.MessageReactions.Add(reaction);
+            await context.SaveChangesAsync(ct);
+
+            var reactionDto = reaction.ToDto();
+
+            // Publish event
+            await _eventBus.PublishAsync(
+                new MessageReactionAddedEvent(message.ChannelId, messageId, reactionDto),
+                ct);
+
+            return Result<MessageReactionDto>.Success(reactionDto);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to add reaction to channel message {MessageId}", messageId);
+            return Result<MessageReactionDto>.Failure(Error.Internal("Failed to add reaction"));
+        }
+    }
+
+    public async Task<Result<MessageReactionDto>> AddDirectMessageReactionAsync(
+        Guid messageId,
+        Guid userId,
+        ReactionType type,
+        string? customEmoji = null,
+        CancellationToken ct = default)
+    {
+        // Validate custom emoji
+        if (type == ReactionType.Custom && string.IsNullOrWhiteSpace(customEmoji))
+            return Result<MessageReactionDto>.Failure(Error.Validation("Custom emoji is required for custom reactions"));
+
+        await using var context = await _contextFactory.CreateDbContextAsync(ct);
+
+        // Check if it's a direct message
+        var directMessage = await context.DirectMessages
+            .Include(m => m.Sender)
+            .Include(m => m.Recipient)
+            .Include(m => m.Reactions)
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(m => m.Id == messageId, ct);
+
+        if (directMessage is null)
+            return Result<MessageReactionDto>.Failure(Error.NotFound("Message not found"));
+
+        if (directMessage.IsDeleted)
+            return Result<MessageReactionDto>.Failure(Error.Forbidden("Cannot react to deleted messages"));
+
+        // Verify user is sender or recipient
+        if (directMessage.SenderId != userId && directMessage.RecipientId != userId)
+            return Result<MessageReactionDto>.Failure(Error.Forbidden("Cannot react to this message"));
+
+        // Verify not already reacted with same type
+        var existingReaction = await context.MessageReactions
+            .FirstOrDefaultAsync(r =>
+                r.DirectMessageId == messageId &&
+                r.UserId == userId &&
+                r.Type == type &&
+                r.CustomEmoji == customEmoji, ct);
+
+        if (existingReaction is not null)
+            return Result<MessageReactionDto>.Failure(Error.Conflict("Already reacted with this reaction"));
+
+        try
+        {
+            var user = await context.Users.FindAsync(userId, ct);
+            if (user is null)
+                return Result<MessageReactionDto>.Failure(Error.NotFound("User not found"));
+
+            var reaction = new MessageReaction
+            {
+                DirectMessageId = messageId,
+                UserId = userId,
+                Type = type,
+                CustomEmoji = customEmoji,
+                User = user
+            };
+
+            context.MessageReactions.Add(reaction);
+            await context.SaveChangesAsync(ct);
+
+            var reactionDto = reaction.ToDto();
+
+            // Publish event
+            await _eventBus.PublishAsync(
+                new DirectMessageReactionAddedEvent(messageId, reactionDto),
+                ct);
+
+            return Result<MessageReactionDto>.Success(reactionDto);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to add reaction to direct message {MessageId}", messageId);
+            return Result<MessageReactionDto>.Failure(Error.Internal("Failed to add reaction"));
+        }
+    }
+
+    public async Task<Result<bool>> RemoveChannelMessageReactionAsync(
+        Guid messageId,
+        Guid reactionId,
+        Guid userId,
+        CancellationToken ct = default)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync(ct);
+
+        var reaction = await context.MessageReactions
+            .Include(r => r.Message)
+            .FirstOrDefaultAsync(r => r.Id == reactionId && r.ChannelMessageId == messageId, ct);
+
+        if (reaction is null)
+            return Result<bool>.Success(true); // Already removed
+
+        if (reaction.Message is null)
+            return Result<bool>.Failure(Error.NotFound("Message not found"));
+
+        // Only the user who added the reaction can remove it
+        if (reaction.UserId != userId)
+            return Result<bool>.Failure(Error.Forbidden("Cannot remove another user's reaction"));
+
+        try
+        {
+            context.MessageReactions.Remove(reaction);
+            await context.SaveChangesAsync(ct);
+
+            // Publish event
+            await _eventBus.PublishAsync(
+                new MessageReactionRemovedEvent(reaction.Message.ChannelId, messageId, reactionId, userId),
+                ct);
+
+            return Result<bool>.Success(true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to remove reaction {ReactionId} from channel message {MessageId}",
+                reactionId, messageId);
+            return Result<bool>.Failure(Error.Internal("Failed to remove reaction"));
+        }
+    }
+
+    public async Task<Result<bool>> RemoveDirectMessageReactionAsync(
+        Guid messageId,
+        Guid reactionId,
+        Guid userId,
+        CancellationToken ct = default)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync(ct);
+
+        var reaction = await context.MessageReactions
+            .Include(r => r.DirectMessage)
+            .FirstOrDefaultAsync(r => r.Id == reactionId && r.DirectMessageId == messageId, ct);
+
+        if (reaction is null)
+            return Result<bool>.Success(true); // Already removed
+
+        if (reaction.DirectMessage is null)
+            return Result<bool>.Failure(Error.NotFound("Message not found"));
+
+        // Only the user who added the reaction can remove it
+        if (reaction.UserId != userId)
+            return Result<bool>.Failure(Error.Forbidden("Cannot remove another user's reaction"));
+
+        try
+        {
+            context.MessageReactions.Remove(reaction);
+            await context.SaveChangesAsync(ct);
+
+            // Publish event
+            await _eventBus.PublishAsync(
+                new DirectMessageReactionRemovedEvent(messageId, reactionId, userId),
+                ct);
+
+            return Result<bool>.Success(true);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to remove reaction {ReactionId} from direct message {MessageId}",
+                reactionId, messageId);
+            return Result<bool>.Failure(Error.Internal("Failed to remove reaction"));
+        }
+    }
+
+    public async Task<Result<IReadOnlyList<MessageReactionDto>>> GetChannelMessageReactionsAsync(
+        Guid messageId,
+        CancellationToken ct = default)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync(ct);
+
+        try
+        {
+            var message = await context.Messages
+                .Include(m => m.Reactions)
+                .ThenInclude(r => r.User)
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(m => m.Id == messageId, ct);
+
+            if (message is null)
+                return Result<IReadOnlyList<MessageReactionDto>>.Failure(Error.NotFound("Message not found"));
+
+            if (message.IsDeleted)
+                return Result<IReadOnlyList<MessageReactionDto>>.Failure(Error.Forbidden("Cannot get reactions for deleted messages"));
+
+            var reactions = message.Reactions
+                .OrderBy(r => r.CreatedAt)
+                .ToList();
+
+            return Result<IReadOnlyList<MessageReactionDto>>.Success(
+                reactions.Select(r => r.ToDto()).ToList());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get reactions for channel message {MessageId}", messageId);
+            return Result<IReadOnlyList<MessageReactionDto>>.Failure(
+                Error.Internal("Failed to get reactions"));
+        }
+    }
+
+    public async Task<Result<IReadOnlyList<MessageReactionDto>>> GetDirectMessageReactionsAsync(
+        Guid messageId,
+        CancellationToken ct = default)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync(ct);
+
+        try
+        {
+            var message = await context.DirectMessages
+                .Include(m => m.Reactions)
+                .ThenInclude(r => r.User)
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(m => m.Id == messageId, ct);
+
+            if (message is null)
+                return Result<IReadOnlyList<MessageReactionDto>>.Failure(Error.NotFound("Message not found"));
+
+            if (message.IsDeleted)
+                return Result<IReadOnlyList<MessageReactionDto>>.Failure(Error.Forbidden("Cannot get reactions for deleted messages"));
+
+            var reactions = message.Reactions
+                .OrderBy(r => r.CreatedAt)
+                .ToList();
+
+            return Result<IReadOnlyList<MessageReactionDto>>.Success(
+                reactions.Select(r => r.ToDto()).ToList());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get reactions for direct message {MessageId}", messageId);
+            return Result<IReadOnlyList<MessageReactionDto>>.Failure(
+                Error.Internal("Failed to get reactions"));
+        }
+    }
+
+    public Task<Result<MessageReactionDto>> AddReactionAsync(
+        Guid messageId,
+        Guid userId,
+        ReactionType type,
+        string? customEmoji = null,
+        CancellationToken ct = default)
+    {
+        throw new NotImplementedException("Use AddChannelMessageReactionAsync or AddDirectMessageReactionAsync instead");
+    }
+
+    public Task<Result<bool>> RemoveReactionAsync(
+        Guid messageId,
+        Guid reactionId,
+        Guid userId,
+        CancellationToken ct = default)
+    {
+        throw new NotImplementedException("Use RemoveChannelMessageReactionAsync or RemoveDirectMessageReactionAsync instead");
+    }
+
+    public Task<Result<IReadOnlyList<MessageReactionDto>>> GetReactionsAsync(
+        Guid messageId,
+        CancellationToken ct = default)
+    {
+        throw new NotImplementedException("Use GetChannelMessageReactionsAsync or GetDirectMessageReactionsAsync instead");
     }
 }

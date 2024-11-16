@@ -1,10 +1,11 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
+
 using Chatty.Shared.Models.Calls;
-using Chatty.Shared.Models.Messages;
-using Chatty.Shared.Models.Users;
 using Chatty.Shared.Models.Enums;
+using Chatty.Shared.Models.Messages;
 using Chatty.Shared.Models.Servers;
+using Chatty.Shared.Models.Users;
 
 namespace Chatty.Backend.Realtime.Events;
 

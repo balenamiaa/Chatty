@@ -31,6 +31,6 @@ public sealed class StickerPack
 
     // Navigation properties
     public User? Creator { get; set; }
-    public ICollection<Sticker> Stickers { get; set; } = new List<Sticker>();
-    public ICollection<Server> EnabledServers { get; set; } = new List<Server>();
+    public ICollection<Sticker> Stickers { get; set; } = [];
+    public ICollection<Server> EnabledServers { get; set; } = [];
 }

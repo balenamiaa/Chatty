@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Concurrent;
 using System.Threading;
+
 using Chatty.Shared.Crypto.KeyExchange;
 using Chatty.Shared.Crypto.Session;
+
 using Microsoft.Extensions.Logging;
 
 namespace Chatty.Shared.Crypto.Session;

@@ -1,12 +1,14 @@
 using System.Net.Mime;
+
+using Chatty.Shared.Models.Attachments;
 using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Models.Users;
-using Chatty.Shared.Models.Attachments;
+
 using ContentType = Chatty.Shared.Models.Enums.ContentType;
 
 namespace Chatty.Shared.Models.Messages;
 
-public sealed record MessageDto(
+public record MessageDto(
     Guid Id,
     Guid ChannelId,
     UserDto Sender,
@@ -19,4 +21,5 @@ public sealed record MessageDto(
     int KeyVersion,
     Guid? ParentMessageId,
     int ReplyCount,
-    IReadOnlyList<AttachmentDto> Attachments);
+    IReadOnlyList<AttachmentDto> Attachments,
+    IReadOnlyList<MessageReactionDto> Reactions);

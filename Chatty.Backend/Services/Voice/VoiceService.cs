@@ -1,11 +1,12 @@
 using Chatty.Backend.Data;
 using Chatty.Backend.Data.Models;
+using Chatty.Backend.Data.Models.Extensions;
 using Chatty.Backend.Realtime.Events;
 using Chatty.Shared.Models.Calls;
 using Chatty.Shared.Models.Common;
 using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Realtime.Events;
-using Chatty.Backend.Data.Models.Extensions;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace Chatty.Backend.Services.Voice;

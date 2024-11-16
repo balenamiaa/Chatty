@@ -1,4 +1,5 @@
 using Carter;
+
 using Chatty.Backend.Services.Auth;
 using Chatty.Shared.Models.Auth;
 

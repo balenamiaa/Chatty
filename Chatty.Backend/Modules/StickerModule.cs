@@ -1,7 +1,10 @@
 using System.Security.Claims;
+
 using Carter;
+
 using Chatty.Backend.Services.Stickers;
 using Chatty.Shared.Models.Stickers;
+
 using Microsoft.AspNetCore.Mvc;
 
 namespace Chatty.Backend.Modules;

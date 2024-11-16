@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+
 using Chatty.Backend.Data;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace Chatty.Backend.Security.DeviceVerification;

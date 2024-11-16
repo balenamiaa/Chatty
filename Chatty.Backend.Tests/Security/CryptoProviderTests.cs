@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
-using Chatty.Shared.Crypto;
 using System.Text;
+
+using Chatty.Shared.Crypto;
+
 using Xunit;
 
 namespace Chatty.Backend.Tests.Security;

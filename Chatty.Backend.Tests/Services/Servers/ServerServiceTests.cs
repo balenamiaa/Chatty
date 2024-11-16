@@ -6,10 +6,13 @@ using Chatty.Backend.Services.Servers;
 using Chatty.Backend.Tests.Helpers;
 using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Models.Servers;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using Moq;
+
 using Xunit;
 
 namespace Chatty.Backend.Tests.Services.Servers;
@@ -126,14 +129,14 @@ public sealed class ServerServiceTests : IDisposable
             Name = "@everyone",
             IsDefault = true,
             Position = 0,
-            Permissions = new List<ServerRolePermission>
-            {
+            Permissions =
+            [
                 new() { Permission = PermissionType.ViewChannels },
                 new() { Permission = PermissionType.SendMessages },
                 new() { Permission = PermissionType.ReadMessageHistory },
                 new() { Permission = PermissionType.Connect },
                 new() { Permission = PermissionType.Speak }
-            }
+            ]
         };
 
         var ownerMember = new ServerMember

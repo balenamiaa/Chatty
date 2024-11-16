@@ -1,13 +1,14 @@
-using FluentValidation;
 using Chatty.Shared.Models.Messages;
+
+using FluentValidation;
 
 namespace Chatty.Shared.Models.Validation;
 
-public sealed class CreateMessageRequestValidator : AbstractValidator<CreateMessageRequest>
+public sealed class CreateDirectMessageRequestValidator : AbstractValidator<CreateDirectMessageRequest>
 {
-    public CreateMessageRequestValidator()
+    public CreateDirectMessageRequestValidator()
     {
-        RuleFor(x => x.ChannelId)
+        RuleFor(x => x.RecipientId)
             .NotEmpty();
 
         RuleFor(x => x.Content)

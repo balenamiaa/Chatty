@@ -1,4 +1,5 @@
 using FluentValidation;
+
 using Microsoft.AspNetCore.Diagnostics;
 
 namespace Chatty.Backend.Infrastructure.Validation;

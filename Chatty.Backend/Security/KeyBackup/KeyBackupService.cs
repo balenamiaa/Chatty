@@ -1,7 +1,8 @@
 using System.Collections.Concurrent;
 using System.Text;
-using Chatty.Shared.Crypto;
 using System.Text.Json;
+
+using Chatty.Shared.Crypto;
 
 namespace Chatty.Backend.Security.KeyBackup;
 

@@ -1,17 +1,20 @@
 using Chatty.Backend.Data;
 using Chatty.Backend.Data.Models;
+using Chatty.Backend.Infrastructure.Configuration;
 using Chatty.Backend.Realtime.Events;
 using Chatty.Backend.Services.Channels;
 using Chatty.Backend.Tests.Helpers;
 using Chatty.Shared.Models.Channels;
 using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Realtime.Events;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Moq;
-using Xunit;
 using Microsoft.Extensions.Options;
-using Chatty.Backend.Infrastructure.Configuration;
+
+using Moq;
+
+using Xunit;
 
 namespace Chatty.Backend.Tests.Services.Channels;
 
@@ -160,14 +163,14 @@ public sealed class ChannelServiceTests : IDisposable
             Name = "@everyone",
             IsDefault = true,
             Position = 0,
-            Permissions = new List<ServerRolePermission>
-            {
+            Permissions =
+            [
                 new() { Permission = PermissionType.ViewChannels },
                 new() { Permission = PermissionType.SendMessages },
                 new() { Permission = PermissionType.ReadMessageHistory },
                 new() { Permission = PermissionType.Connect },
                 new() { Permission = PermissionType.Speak }
-            }
+            ]
         };
 
         var ownerMember = new ServerMember

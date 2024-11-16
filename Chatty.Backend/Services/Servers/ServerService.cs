@@ -2,12 +2,13 @@ using Chatty.Backend.Data;
 using Chatty.Backend.Data.Models;
 using Chatty.Backend.Data.Models.Extensions;
 using Chatty.Backend.Infrastructure.Configuration;
-using Chatty.Shared.Models.Common;
-using Chatty.Shared.Models.Servers;
-using Microsoft.EntityFrameworkCore;
 using Chatty.Backend.Realtime.Events;
+using Chatty.Shared.Models.Common;
 using Chatty.Shared.Models.Enums;
+using Chatty.Shared.Models.Servers;
 using Chatty.Shared.Realtime.Events;
+
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace Chatty.Backend.Services.Servers;
@@ -62,14 +63,14 @@ public sealed class ServerService : IServerService
                 Name = "@everyone",
                 IsDefault = true,
                 Position = 0,
-                Permissions = new List<ServerRolePermission>
-                {
+                Permissions =
+                [
                     new() { Permission = PermissionType.ViewChannels },
                     new() { Permission = PermissionType.SendMessages },
                     new() { Permission = PermissionType.ReadMessageHistory },
                     new() { Permission = PermissionType.Connect },
                     new() { Permission = PermissionType.Speak }
-                }
+                ]
             };
 
             _context.ServerRoles.Add(defaultRole);

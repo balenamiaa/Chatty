@@ -1,7 +1,10 @@
 using System.Security.Claims;
+
 using Carter;
-using Chatty.Backend.Security.KeyRotation;
+
 using Chatty.Backend.Security.KeyBackup;
+using Chatty.Backend.Security.KeyRotation;
+
 using Microsoft.AspNetCore.Mvc;
 
 namespace Chatty.Backend.Modules;

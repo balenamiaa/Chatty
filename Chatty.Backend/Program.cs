@@ -1,15 +1,20 @@
-using Carter;
-using Chatty.Backend.Infrastructure;
-using Chatty.Backend.Infrastructure.Validation;
-using Chatty.Backend.Realtime.Hubs;
-using Serilog;
-using FluentValidation;
-using Microsoft.AspNetCore.Mvc.Filters;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Text.Json;
+
+using Carter;
+
+using Chatty.Backend.Infrastructure;
 using Chatty.Backend.Infrastructure.Configuration;
+using Chatty.Backend.Infrastructure.Validation;
+using Chatty.Backend.Realtime.Hubs;
+
+using FluentValidation;
+
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.IdentityModel.Tokens;
+
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 

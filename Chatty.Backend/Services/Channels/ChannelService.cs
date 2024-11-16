@@ -3,9 +3,10 @@ using Chatty.Backend.Data.Models;
 using Chatty.Backend.Data.Models.Extensions;
 using Chatty.Backend.Infrastructure.Configuration;
 using Chatty.Backend.Realtime.Events;
-using Chatty.Shared.Models.Common;
 using Chatty.Shared.Models.Channels;
+using Chatty.Shared.Models.Common;
 using Chatty.Shared.Realtime.Events;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 

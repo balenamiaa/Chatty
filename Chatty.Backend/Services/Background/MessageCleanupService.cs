@@ -1,4 +1,5 @@
 using Chatty.Backend.Data;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace Chatty.Backend.Services.Background;

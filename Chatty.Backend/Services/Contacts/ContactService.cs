@@ -5,6 +5,7 @@ using Chatty.Backend.Realtime.Events;
 using Chatty.Shared.Models.Common;
 using Chatty.Shared.Models.Contacts;
 using Chatty.Shared.Models.Enums;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace Chatty.Backend.Services.Contacts;

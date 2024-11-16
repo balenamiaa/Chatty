@@ -1,27 +1,30 @@
-using System.Security.Claims;
-using Chatty.Backend.Realtime.Events;
-using Microsoft.AspNetCore.SignalR;
-using Chatty.Shared.Realtime.Hubs;
-using Chatty.Backend.Services.Messages;
-using Chatty.Backend.Services.Voice;
-using Chatty.Backend.Services.Presence;
-using Chatty.Backend.Services.Users;
-using Chatty.Shared.Models.Enums;
-using Chatty.Shared.Models.Users;
-using Chatty.Shared.Realtime.Events;
-using Chatty.Shared.Models.Common;
-using Microsoft.AspNetCore.Authorization;
 using System.Runtime.CompilerServices;
-using Chatty.Backend.Services.Channels;
-using Chatty.Backend.Services.Servers;
-using Chatty.Shared.Models.Messages;
-using Chatty.Shared.Models.Notifications;
+using System.Security.Claims;
+using System.Text.Json;
+
 using Chatty.Backend.Data;
 using Chatty.Backend.Data.Models;
 using Chatty.Backend.Data.Models.Extensions;
-using Microsoft.EntityFrameworkCore;
+using Chatty.Backend.Realtime.Events;
+using Chatty.Backend.Services.Channels;
+using Chatty.Backend.Services.Messages;
+using Chatty.Backend.Services.Presence;
+using Chatty.Backend.Services.Servers;
+using Chatty.Backend.Services.Users;
+using Chatty.Backend.Services.Voice;
+using Chatty.Shared.Models.Common;
+using Chatty.Shared.Models.Enums;
+using Chatty.Shared.Models.Messages;
+using Chatty.Shared.Models.Notifications;
+using Chatty.Shared.Models.Users;
+using Chatty.Shared.Realtime.Events;
+using Chatty.Shared.Realtime.Hubs;
+
 using FluentValidation;
-using System.Text.Json;
+
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Chatty.Backend.Realtime.Hubs;
 

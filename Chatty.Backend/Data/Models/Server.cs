@@ -11,7 +11,7 @@ public sealed class Server
 
     // Navigation properties
     public User Owner { get; set; } = null!;
-    public ICollection<ServerRole> Roles { get; set; } = new List<ServerRole>();
-    public ICollection<ServerMember> Members { get; set; } = new List<ServerMember>();
-    public ICollection<Channel> Channels { get; set; } = new List<Channel>();
+    public ICollection<ServerRole> Roles { get; set; } = [];
+    public ICollection<ServerMember> Members { get; set; } = [];
+    public ICollection<Channel> Channels { get; set; } = [];
 }

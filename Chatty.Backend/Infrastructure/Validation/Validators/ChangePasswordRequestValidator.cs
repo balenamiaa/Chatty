@@ -1,18 +1,14 @@
-using FluentValidation;
 using Chatty.Shared.Models.Users;
+
+using FluentValidation;
 
 namespace Chatty.Shared.Models.Validation;
 
-public sealed class ResetPasswordRequestValidator : AbstractValidator<ResetPasswordRequest>
+public sealed class ChangePasswordRequestValidator : AbstractValidator<ChangePasswordRequest>
 {
-    public ResetPasswordRequestValidator()
+    public ChangePasswordRequestValidator()
     {
-        RuleFor(x => x.Email)
-            .NotEmpty()
-            .EmailAddress()
-            .MaximumLength(255);
-
-        RuleFor(x => x.ResetToken)
+        RuleFor(x => x.CurrentPassword)
             .NotEmpty();
 
         RuleFor(x => x.NewPassword)

@@ -1,6 +1,8 @@
 using Carter;
+
 using Chatty.Backend.Services.Notifications;
 using Chatty.Shared.Models.Notifications;
+
 using Microsoft.AspNetCore.Mvc;
 
 namespace Chatty.Backend.Modules;

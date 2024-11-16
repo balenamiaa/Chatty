@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+
 using Chatty.Shared.Realtime.Events;
 
 namespace Chatty.Backend.Realtime.Events;
@@ -54,7 +55,7 @@ public sealed class EventBus : IEventBus
         var eventType = typeof(TEvent);
         async Task WrapperHandler(object e) => await handler((TEvent)e);
 
-        var handlers = _handlers.GetOrAdd(eventType, _ => new ConcurrentBag<Func<object, Task>>());
+        var handlers = _handlers.GetOrAdd(eventType, _ => []);
         handlers.Add(WrapperHandler);
 
         return new Subscription(() =>

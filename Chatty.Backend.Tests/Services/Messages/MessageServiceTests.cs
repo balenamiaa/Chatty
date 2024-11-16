@@ -5,13 +5,17 @@ using Chatty.Backend.Realtime.Events;
 using Chatty.Backend.Services.Messages;
 using Chatty.Backend.Tests.Helpers;
 using Chatty.Shared.Crypto;
+using Chatty.Shared.Models.Common;
 using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Models.Messages;
 using Chatty.Shared.Realtime.Events;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using Moq;
+
 using Xunit;
 
 namespace Chatty.Backend.Tests.Services.Messages;
@@ -20,7 +24,6 @@ public sealed class MessageServiceTests : IDisposable
 {
     private readonly IDbContextFactory<ChattyDbContext> _contextFactory;
     private readonly Mock<IEventBus> _eventBus;
-    private readonly IOptions<LimitSettings> _limitSettings;
     private readonly MessageService _sut;
 
     public MessageServiceTests()
@@ -29,25 +32,13 @@ public sealed class MessageServiceTests : IDisposable
         _eventBus = new Mock<IEventBus>();
         Mock<ICryptoProvider> crypto = new();
         Mock<ILogger<MessageService>> logger = new();
-        _limitSettings = Options.Create(new LimitSettings
-        {
-            MaxMessageLength = 1024,
-            RateLimits = new RateLimitSettings
-            {
-                Messages = new RateLimit
-                {
-                    Points = 10,
-                    DurationSeconds = 60
-                }
-            }
-        });
 
         _sut = new MessageService(
             _contextFactory,
             _eventBus.Object,
             crypto.Object,
             logger.Object,
-            _limitSettings);
+            TestData.Settings.LimitSettings);
 
         SetupTestData().Wait();
     }
@@ -236,7 +227,7 @@ public sealed class MessageServiceTests : IDisposable
             KeyVersion: 1);
 
         // Send messages until rate limit is exceeded
-        for (int i = 0; i < _limitSettings.Value.RateLimits.Messages.Points; i++)
+        for (int i = 0; i < TestData.Settings.LimitSettings.Value.RateLimits.Messages.Points; i++)
         {
             await _sut.CreateAsync(userId, request);
         }
@@ -290,7 +281,7 @@ public sealed class MessageServiceTests : IDisposable
             ContentType = ContentType.Text,
             MessageNonce = [4, 5, 6],
             KeyVersion = 1,
-            Attachments = new List<Attachment> { attachment }
+            Attachments = [attachment]
         };
 
         context.Messages.Add(message);
@@ -377,7 +368,7 @@ public sealed class MessageServiceTests : IDisposable
             MessageNonce = [4, 5, 6],
             KeyVersion = 1
         };
-        
+
         await using (var context1 = await _contextFactory.CreateDbContextAsync())
         {
             context1.DirectMessages.Add(message);
@@ -399,7 +390,9 @@ public sealed class MessageServiceTests : IDisposable
         await using var context2 = await _contextFactory.CreateDbContextAsync();
 
         // Verify message is marked as deleted
-        var deletedMessage = await context2.DirectMessages.FindAsync(message.Id);
+        var deletedMessage = await context2.DirectMessages
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(m => m.Id == message.Id);
         Assert.NotNull(deletedMessage);
         Assert.True(deletedMessage.IsDeleted);
     }
@@ -509,6 +502,144 @@ public sealed class MessageServiceTests : IDisposable
                 e.Message.Content.SequenceEqual(request.Content)),
             It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task AddReactionAsync_WithConcurrentReactions_HandlesRaceCondition()
+    {
+        // Arrange
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var message = await CreateMessageWithAttachment(context);
+        var tasks = new List<Task<Result<MessageReactionDto>>>();
+
+        // Act
+        for (int i = 0; i < 5; i++)
+        {
+            tasks.Add(_sut.AddChannelMessageReactionAsync(
+                messageId: message.Id,
+                userId: TestData.Users.User1.Id,
+                type: ReactionType.Like,
+                ct: CancellationToken.None));
+        }
+
+        var results = await Task.WhenAll(tasks);
+
+        // Assert
+        Assert.Single(results, r => r.IsSuccess);
+        Assert.Equal(4, results.Count(r => r.IsFailure));
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithInvalidContent_ReturnsFailure()
+    {
+        // Arrange
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var message = await CreateMessageWithAttachment(context);
+        var request = new UpdateMessageRequest(
+            Content: new byte[TestData.Settings.LimitSettings.Value.MaxMessageLength + 1],
+            ContentType: ContentType.Text,
+            MessageNonce: [4, 5, 6],
+            KeyVersion: 1);
+
+        // Act
+        var result = await _sut.UpdateAsync(message.Id, message.SenderId, request, CancellationToken.None);
+
+        // Assert
+        Assert.True(result.IsFailure);
+        Assert.Equal("Validation", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_PublishesEventWithCorrectData()
+    {
+        // Arrange
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var message = await CreateMessageWithAttachment(context);
+        var request = new UpdateMessageRequest(
+            Content: [1, 2, 3],
+            ContentType: ContentType.Text,
+            MessageNonce: [4, 5, 6],
+            KeyVersion: 2);
+
+        // Act
+        var result = await _sut.UpdateAsync(message.Id, message.SenderId, request, CancellationToken.None);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        _eventBus.Verify(x => x.PublishAsync(
+            It.Is<MessageUpdatedEvent>(e =>
+                e.ChannelId == message.ChannelId &&
+                e.Message.Id == message.Id &&
+                e.Message.KeyVersion == request.KeyVersion),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetChannelMessageReactionsAsync_ReturnsOrderedReaction()
+    {
+        // Arrange
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var message = await CreateMessageWithAttachment(context);
+
+        // Add reactions with specific timestamps for ordering verification
+        for (int i = 0; i < 3; i++)
+        {
+            var reaction = new MessageReaction
+            {
+                ChannelMessageId = message.Id,
+                UserId = TestData.Users.User1.Id,
+                Type = ReactionType.Custom,
+                CustomEmoji = $"emoji_{i}",
+                CreatedAt = DateTime.UtcNow.AddMinutes(-i) // Each reaction created 1 minute apart
+            };
+            context.MessageReactions.Add(reaction);
+        }
+        await context.SaveChangesAsync();
+
+        // Act
+        var result = await _sut.GetChannelMessageReactionsAsync(message.Id, CancellationToken.None);
+
+        // Assert
+        Assert.True(result.IsSuccess);
+        Assert.Equal(3, result.Value.Count);
+
+        // Verify ordering by CreatedAt
+        var reactions = result.Value.ToList();
+        for (int i = 0; i < reactions.Count - 1; i++)
+        {
+            Assert.True(reactions[i].CreatedAt <= reactions[i + 1].CreatedAt);
+        }
+    }
+
+    [Fact]
+    public async Task RateLimit_ResetsAfterWindowExpires()
+    {
+        // Arrange
+        var userId = TestData.Users.User1.Id;
+        var request = new CreateMessageRequest(
+            ChannelId: TestData.Channels.TextChannel.Id,
+            Content: [1, 2, 3],
+            ContentType: ContentType.Text,
+            MessageNonce: [4, 5, 6],
+            KeyVersion: 1);
+
+        // Send messages until rate limit is exceeded
+        for (int i = 0; i < TestData.Settings.LimitSettings.Value.RateLimits.Messages.Points; i++)
+        {
+            await _sut.CreateAsync(userId, request);
+        }
+
+        var result = await _sut.CreateAsync(userId, request);
+        Assert.True(result.IsFailure);
+        Assert.Equal("TooManyRequests", result.Error.Code);
+
+        // Wait for rate limit window to expire
+        await Task.Delay(TimeSpan.FromSeconds(TestData.Settings.LimitSettings.Value.RateLimits.Messages.DurationSeconds));
+
+        // Should be able to send message again
+        result = await _sut.CreateAsync(userId, request);
+        Assert.True(result.IsSuccess);
     }
 
     public void Dispose()

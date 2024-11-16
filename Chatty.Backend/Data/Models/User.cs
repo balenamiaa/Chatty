@@ -19,5 +19,5 @@ public sealed class User
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation properties
-    public ICollection<UserDevice> Devices { get; set; } = new List<UserDevice>();
+    public ICollection<UserDevice> Devices { get; set; } = [];
 }

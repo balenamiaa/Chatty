@@ -7,7 +7,7 @@ public static class MessageExtensions
     public static MessageDto ToDto(this Message message) => new(
         Id: message.Id,
         ChannelId: message.ChannelId,
-        Sender: message.Sender.ToDto(),
+        Sender: message.Sender!.ToDto(),
         Content: message.Content,
         ContentType: message.ContentType,
         SentAt: message.SentAt,
@@ -17,12 +17,13 @@ public static class MessageExtensions
         KeyVersion: message.KeyVersion,
         ParentMessageId: message.ParentMessageId,
         ReplyCount: message.ReplyCount,
-        Attachments: message.Attachments.Select(a => a.ToDto()).ToList());
+        Attachments: message.Attachments.Select(a => a.ToDto()).ToList(),
+        Reactions: message.Reactions.Select(r => r.ToDto()).ToList());
 
     public static DirectMessageDto ToDto(this DirectMessage message) => new(
         Id: message.Id,
-        Sender: message.Sender.ToDto(),
-        Recipient: message.Recipient.ToDto(),
+        Sender: message.Sender!.ToDto(),
+        Recipient: message.Recipient!.ToDto(),
         Content: message.Content,
         ContentType: message.ContentType,
         SentAt: message.SentAt,
@@ -31,5 +32,6 @@ public static class MessageExtensions
         KeyVersion: message.KeyVersion,
         ParentMessageId: message.ParentMessageId,
         ReplyCount: message.ReplyCount,
-        Attachments: message.Attachments.Select(a => a.ToDto()).ToList());
+        Attachments: message.Attachments.Select(a => a.ToDto()).ToList(),
+        Reactions: message.Reactions.Select(r => r.ToDto()).ToList());
 }

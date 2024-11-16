@@ -1,6 +1,9 @@
 using Chatty.Backend.Realtime;
+
 using Microsoft.Extensions.Logging;
+
 using Moq;
+
 using Xunit;
 
 namespace Chatty.Backend.Tests.Realtime;

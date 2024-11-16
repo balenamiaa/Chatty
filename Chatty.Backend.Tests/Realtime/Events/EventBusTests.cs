@@ -4,8 +4,11 @@ using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Models.Messages;
 using Chatty.Shared.Models.Users;
 using Chatty.Shared.Realtime.Events;
+
 using Microsoft.Extensions.Logging;
+
 using Moq;
+
 using Xunit;
 
 namespace Chatty.Backend.Tests.Realtime.Events;
@@ -51,7 +54,8 @@ public sealed class EventBusTests
             KeyVersion: 1,
             ParentMessageId: null,
             ReplyCount: 0,
-            Attachments: Array.Empty<AttachmentDto>());
+            Attachments: [],
+            Reactions: []);
 
         var @event = new MessageEvent(channelId, message);
 

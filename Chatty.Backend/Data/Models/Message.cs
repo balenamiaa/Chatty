@@ -1,11 +1,14 @@
 using Chatty.Shared.Models.Enums;
 
 namespace Chatty.Backend.Data.Models;
+
 public sealed class Message
 {
     public Guid Id { get; set; }
     public Guid ChannelId { get; set; }
+    public Channel? Channel { get; set; }
     public Guid SenderId { get; set; }
+    public User? Sender { get; set; }
     public required byte[] Content { get; set; }
     public ContentType ContentType { get; set; } = ContentType.Text;
     public DateTime SentAt { get; set; } = DateTime.UtcNow;
@@ -14,12 +17,9 @@ public sealed class Message
     public required byte[] MessageNonce { get; set; }
     public int KeyVersion { get; set; } = 1;
     public Guid? ParentMessageId { get; set; }
-    public int ReplyCount { get; set; }
-
-    // Navigation properties
-    public Channel Channel { get; set; } = null!;
-    public User Sender { get; set; } = null!;
     public Message? ParentMessage { get; set; }
-    public ICollection<Message> Replies { get; set; } = new List<Message>();
-    public ICollection<Attachment> Attachments { get; set; } = new List<Attachment>();
+    public int ReplyCount { get; set; }
+    public ICollection<Message> Replies { get; set; } = [];
+    public ICollection<Attachment> Attachments { get; set; } = [];
+    public ICollection<MessageReaction> Reactions { get; set; } = [];
 }

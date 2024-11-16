@@ -3,6 +3,7 @@ using Chatty.Backend.Realtime;
 using Chatty.Backend.Realtime.Events;
 using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Realtime.Events;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace Chatty.Backend.Services.Background;

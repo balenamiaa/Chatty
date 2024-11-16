@@ -1,4 +1,5 @@
 using Chatty.Backend.Data;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 
@@ -6,19 +7,23 @@ namespace Chatty.Backend.Tests.Helpers;
 
 public static class TestDbContextFactory
 {
-    public static IDbContextFactory<ChattyDbContext> CreateFactory()
+    public static IDbContextFactory<ChattyDbContext> CreateFactory(string testClassName = null)
     {
+        var databaseName = testClassName ?? Guid.NewGuid().ToString();
         var options = new DbContextOptionsBuilder<ChattyDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .UseInMemoryDatabase(databaseName: databaseName)
+            .EnableSensitiveDataLogging()
             .Options;
 
         return new PooledDbContextFactory<ChattyDbContext>(options);
     }
 
-    public static ChattyDbContext Create()
+    public static ChattyDbContext Create(string testClassName = null)
     {
+        var databaseName = testClassName ?? Guid.NewGuid().ToString();
         var options = new DbContextOptionsBuilder<ChattyDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .UseInMemoryDatabase(databaseName: databaseName)
+            .EnableSensitiveDataLogging()
             .Options;
 
         var context = new ChattyDbContext(options);

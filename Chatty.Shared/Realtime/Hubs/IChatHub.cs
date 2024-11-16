@@ -2,8 +2,8 @@ using Chatty.Shared.Models.Calls;
 using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Models.Messages;
 using Chatty.Shared.Models.Notifications;
-using Chatty.Shared.Models.Users;
 using Chatty.Shared.Models.Servers;
+using Chatty.Shared.Models.Users;
 
 namespace Chatty.Shared.Realtime.Hubs;
 
@@ -50,6 +50,13 @@ public interface IChatHubClient
     // Notification events
     Task OnNotification(string title, string message);
     Task OnPushNotification(string title, string message, Dictionary<string, string>? data = null);
+
+    // Reaction events
+    Task OnMessageReactionAdded(Guid? channelId, Guid messageId, MessageReactionDto reaction);
+    Task OnMessageReactionRemoved(Guid? channelId, Guid messageId, Guid reactionId, Guid userId);
+
+    Task OnDirectMessageReactionAdded(Guid messageId, MessageReactionDto reaction);
+    Task OnDirectMessageReactionRemoved(Guid messageId, Guid reactionId, Guid userId);
 }
 
 /// <summary>

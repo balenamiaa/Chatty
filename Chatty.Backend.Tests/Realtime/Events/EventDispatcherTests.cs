@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+
 using Chatty.Backend.Data;
 using Chatty.Backend.Data.Models;
 using Chatty.Backend.Data.Models.Extensions;
@@ -9,9 +10,12 @@ using Chatty.Backend.Tests.Helpers;
 using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Models.Messages;
 using Chatty.Shared.Realtime.Hubs;
+
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
+
 using Moq;
+
 using Xunit;
 
 namespace Chatty.Backend.Tests.Realtime.Events;

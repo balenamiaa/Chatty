@@ -15,5 +15,5 @@ public sealed class Call
     // Navigation properties
     public Channel? Channel { get; set; }
     public User Initiator { get; set; } = null!;
-    public ICollection<CallParticipant> Participants { get; set; } = new List<CallParticipant>();
+    public ICollection<CallParticipant> Participants { get; set; } = [];
 }

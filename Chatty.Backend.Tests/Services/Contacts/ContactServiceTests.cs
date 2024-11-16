@@ -5,9 +5,12 @@ using Chatty.Backend.Services.Contacts;
 using Chatty.Backend.Tests.Helpers;
 using Chatty.Shared.Models.Contacts;
 using Chatty.Shared.Models.Enums;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+
 using Moq;
+
 using Xunit;
 
 namespace Chatty.Backend.Tests.Services.Contacts;

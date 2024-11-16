@@ -1,9 +1,13 @@
 using System.Security.Claims;
+
 using Carter;
+
 using Chatty.Backend.Services.Users;
 using Chatty.Shared.Models.Users;
+
 using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
+
 using ResetPasswordRequest = Chatty.Shared.Models.Users.ResetPasswordRequest;
 
 namespace Chatty.Backend.Modules;

@@ -1,6 +1,7 @@
-using Microsoft.EntityFrameworkCore;
 using Chatty.Backend.Data.Models;
 using Chatty.Shared.Models.Enums;
+
+using Microsoft.EntityFrameworkCore;
 
 namespace Chatty.Backend.Data;
 
@@ -19,6 +20,7 @@ public sealed class ChattyDbContext : DbContext
     public DbSet<Channel> Channels => Set<Channel>();
     public DbSet<ChannelMember> ChannelMembers => Set<ChannelMember>();
     public DbSet<Message> Messages => Set<Message>();
+    public DbSet<MessageReaction> MessageReactions => Set<MessageReaction>();
     public DbSet<DirectMessage> DirectMessages => Set<DirectMessage>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
     public DbSet<Contact> Contacts => Set<Contact>();
@@ -195,6 +197,8 @@ public sealed class ChattyDbContext : DbContext
                     v => v.ToString(),
                     v => Enum.Parse<ContentType>(v));
 
+            entity.HasQueryFilter(m => !m.IsDeleted);
+
             entity.HasOne(m => m.Channel)
                 .WithMany(c => c.Messages)
                 .HasForeignKey(m => m.ChannelId)
@@ -211,6 +215,43 @@ public sealed class ChattyDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // MessageReaction configuration
+        modelBuilder.Entity<MessageReaction>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            // Only one message type can be set
+            entity.HasCheckConstraint("CK_MessageReaction_OneMessageType",
+                "(\"ChannelMessageId\" IS NOT NULL AND \"DirectMessageId\" IS NULL) OR " +
+                "(\"ChannelMessageId\" IS NULL AND \"DirectMessageId\" IS NOT NULL)");
+
+            // Unique constraint: one reaction type per user per message
+            entity.HasIndex(e => new { e.ChannelMessageId, e.UserId, e.Type, e.CustomEmoji })
+                .IsUnique()
+                .HasFilter("\"ChannelMessageId\" IS NOT NULL");
+
+            entity.HasIndex(e => new { e.DirectMessageId, e.UserId, e.Type, e.CustomEmoji })
+                .IsUnique()
+                .HasFilter("\"DirectMessageId\" IS NOT NULL");
+
+            entity.HasOne(r => r.User)
+                .WithMany()
+                .HasForeignKey(r => r.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure Message relationship
+            entity.HasOne(r => r.Message)
+                .WithMany(m => m.Reactions)
+                .HasForeignKey(r => r.ChannelMessageId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure DirectMessage relationship
+            entity.HasOne(r => r.DirectMessage)
+                .WithMany(m => m.Reactions)
+                .HasForeignKey(r => r.DirectMessageId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // DirectMessage configuration
         modelBuilder.Entity<DirectMessage>(entity =>
         {
@@ -223,6 +264,8 @@ public sealed class ChattyDbContext : DbContext
                 .HasConversion(
                     v => v.ToString(),
                     v => Enum.Parse<ContentType>(v));
+
+            entity.HasQueryFilter(m => !m.IsDeleted);
 
             entity.HasOne(m => m.Sender)
                 .WithMany()
@@ -400,8 +443,10 @@ public sealed class ChattyDbContext : DbContext
         modelBuilder.Entity<Attachment>()
             .HasIndex(a => a.ContentType);
 
-        // Add soft delete filter
         modelBuilder.Entity<Message>()
+            .HasQueryFilter(m => !m.IsDeleted);
+
+        modelBuilder.Entity<DirectMessage>()
             .HasQueryFilter(m => !m.IsDeleted);
     }
 }

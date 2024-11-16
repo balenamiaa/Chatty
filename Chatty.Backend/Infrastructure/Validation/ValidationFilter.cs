@@ -1,4 +1,5 @@
 using FluentValidation;
+
 using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace Chatty.Backend.Infrastructure.Validation;
