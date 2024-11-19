@@ -1,6 +1,7 @@
 using Chatty.Backend.Services.Common;
 using Chatty.Shared.Models.Channels;
 using Chatty.Shared.Models.Common;
+using Chatty.Shared.Models.Enums;
 
 namespace Chatty.Backend.Services.Channels;
 
@@ -14,4 +15,7 @@ public interface IChannelService : IService
     Task<Result<bool>> AddMemberAsync(Guid channelId, Guid userId, CancellationToken ct = default);
     Task<Result<bool>> RemoveMemberAsync(Guid channelId, Guid userId, CancellationToken ct = default);
     Task<Result<bool>> CanAccessAsync(Guid userId, Guid channelId, CancellationToken ct = default);
+
+    Task<Result<bool>> HasPermissionAsync(Guid userId, Guid channelId, PermissionType permission,
+        CancellationToken ct = default);
 }

@@ -106,10 +106,8 @@ public sealed class KeyBackupService(
 
     public Task<bool> RevokeBackupAsync(
         Guid userId,
-        CancellationToken ct = default)
-    {
-        return Task.FromResult(_backupKeys.TryRemove(userId, out _));
-    }
+        CancellationToken ct = default) =>
+        Task.FromResult(_backupKeys.TryRemove(userId, out _));
 
     private class BackupData
     {

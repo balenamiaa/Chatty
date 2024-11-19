@@ -1,5 +1,4 @@
 using Chatty.Backend.Data;
-using Chatty.Backend.Data.Models;
 using Chatty.Backend.Realtime;
 using Chatty.Backend.Realtime.Events;
 using Chatty.Backend.Services.Presence;
@@ -18,8 +17,8 @@ namespace Chatty.Backend.Tests.Services.Presence;
 
 public sealed class PresenceServiceTests : IDisposable
 {
-    private readonly IDbContextFactory<ChattyDbContext> _contextFactory;
     private readonly Mock<IConnectionTracker> _connectionTracker;
+    private readonly IDbContextFactory<ChattyDbContext> _contextFactory;
     private readonly Mock<IEventBus> _eventBus;
     private readonly Mock<ILogger<PresenceService>> _logger;
     private readonly PresenceService _sut;
@@ -39,6 +38,8 @@ public sealed class PresenceServiceTests : IDisposable
 
         SetupTestData();
     }
+
+    public void Dispose() => TestDbContextFactory.Destroy(_contextFactory);
 
     [Fact]
     public async Task UpdateStatusAsync_WithValidStatus_ReturnsSuccess()
@@ -62,11 +63,11 @@ public sealed class PresenceServiceTests : IDisposable
 
         // Verify event was published
         _eventBus.Verify(x => x.PublishAsync(
-            It.Is<PresenceEvent>(e =>
-                e.UserId == userId &&
-                e.Status == status &&
-                e.StatusMessage == statusMessage),
-            It.IsAny<CancellationToken>()),
+                It.Is<PresenceEvent>(e =>
+                    e.UserId == userId &&
+                    e.Status == status &&
+                    e.StatusMessage == statusMessage),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -128,12 +129,12 @@ public sealed class PresenceServiceTests : IDisposable
         _connectionTracker.Setup(x => x.GetConnectionsAsync(It.IsAny<IEnumerable<Guid>>()))
             .ReturnsAsync(new Dictionary<Guid, IReadOnlyList<string>>
             {
-                { user1, new[] { "connection1" } },
+                { user1, ["connection1"] },
                 { user2, Array.Empty<string>() }
             });
 
         // Act
-        var result = await _sut.GetUsersStatusAsync(new[] { user1, user2 });
+        var result = await _sut.GetUsersStatusAsync([user1, user2]);
 
         // Assert
         Assert.True(result.IsSuccess);
@@ -145,10 +146,5 @@ public sealed class PresenceServiceTests : IDisposable
     {
         using var context = _contextFactory.CreateDbContext();
         TestData.TestDbSeeder.SeedBasicTestData(context);
-    }
-
-    public void Dispose()
-    {
-        TestDbContextFactory.Destroy(_contextFactory);
     }
 }

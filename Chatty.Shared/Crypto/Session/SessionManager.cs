@@ -1,31 +1,19 @@
-using System;
 using System.Collections.Concurrent;
-using System.Threading;
 
 using Chatty.Shared.Crypto.KeyExchange;
-using Chatty.Shared.Crypto.Session;
 
 using Microsoft.Extensions.Logging;
 
 namespace Chatty.Shared.Crypto.Session;
 
-public sealed class SessionManager : ISessionManager
+public sealed class SessionManager(
+    IKeyExchangeService keyExchange,
+    ICryptoProvider crypto,
+    ILogger<SessionManager> logger)
+    : ISessionManager
 {
-    private static readonly ConcurrentDictionary<(Guid UserId, Guid DeviceId), (byte[] Key, int Version)> _sessions = new();
-
-    private readonly IKeyExchangeService _keyExchange;
-    private readonly ICryptoProvider _crypto;
-    private readonly ILogger<SessionManager> _logger;
-
-    public SessionManager(
-        IKeyExchangeService keyExchange,
-        ICryptoProvider crypto,
-        ILogger<SessionManager> logger)
-    {
-        _keyExchange = keyExchange;
-        _crypto = crypto;
-        _logger = logger;
-    }
+    private static readonly ConcurrentDictionary<(Guid UserId, Guid DeviceId), (byte[] Key, int Version)> _sessions =
+        new();
 
     public Task<byte[]> GetSessionKeyAsync(
         Guid userId,
@@ -51,17 +39,17 @@ public sealed class SessionManager : ISessionManager
         try
         {
             // Generate our keypair
-            var (ourPublicKey, ourPrivateKey) = await _keyExchange.GenerateKeyPairAsync();
+            var (ourPublicKey, ourPrivateKey) = await keyExchange.GenerateKeyPairAsync();
 
             // Perform key exchange
-            var sharedSecret = await _keyExchange.PerformKeyExchangeAsync(
+            var sharedSecret = await keyExchange.PerformKeyExchangeAsync(
                 ourPrivateKey,
                 publicKey,
                 preKey);
 
             // Derive session key
-            var salt = _crypto.GenerateNonce();
-            var sessionKey = await _keyExchange.DeriveSessionKeyAsync(
+            var salt = crypto.GenerateNonce();
+            var sessionKey = await keyExchange.DeriveSessionKeyAsync(
                 sharedSecret,
                 salt,
                 $"session:{userId}:{deviceId}");
@@ -76,7 +64,7 @@ public sealed class SessionManager : ISessionManager
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create session for user {UserId} device {DeviceId}", userId, deviceId);
+            logger.LogError(ex, "Failed to create session for user {UserId} device {DeviceId}", userId, deviceId);
             throw;
         }
     }
@@ -84,8 +72,6 @@ public sealed class SessionManager : ISessionManager
     public Task<bool> InvalidateSessionAsync(
         Guid userId,
         Guid deviceId,
-        CancellationToken ct = default)
-    {
-        return Task.FromResult(_sessions.TryRemove((userId, deviceId), out _));
-    }
+        CancellationToken ct = default) =>
+        Task.FromResult(_sessions.TryRemove((userId, deviceId), out _));
 }

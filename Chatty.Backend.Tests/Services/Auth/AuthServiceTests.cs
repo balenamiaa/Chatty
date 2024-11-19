@@ -19,12 +19,12 @@ namespace Chatty.Backend.Tests.Services.Auth;
 
 public sealed class AuthServiceTests : IDisposable
 {
-    private readonly Mock<ICryptoProvider> _crypto;
-    private readonly ChattyDbContext _context;
-    private readonly AuthService _service;
     private readonly IConfiguration _configuration;
-    private readonly ILogger<AuthService> _logger;
+    private readonly ChattyDbContext _context;
+    private readonly Mock<ICryptoProvider> _crypto;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ILogger<AuthService> _logger;
+    private readonly AuthService _service;
 
     public AuthServiceTests()
     {
@@ -51,7 +51,7 @@ public sealed class AuthServiceTests : IDisposable
         };
 
         var options = new DbContextOptionsBuilder<ChattyDbContext>()
-            .UseInMemoryDatabase(databaseName: $"ChattyTest_{Guid.NewGuid()}")
+            .UseInMemoryDatabase($"ChattyTest_{Guid.NewGuid()}")
             .Options;
         _context = new ChattyDbContext(options);
 
@@ -61,6 +61,8 @@ public sealed class AuthServiceTests : IDisposable
         _context.Users.Add(TestData.Users.User1);
         _context.SaveChanges(); // Use synchronous SaveChanges in constructor
     }
+
+    public void Dispose() => _context.Dispose();
 
     [Fact]
     public async Task AuthenticateAsync_WithValidCredentials_ReturnsSuccess()
@@ -108,10 +110,10 @@ public sealed class AuthServiceTests : IDisposable
         // Arrange
         var deviceId = Guid.NewGuid();
         var request = new AuthRequest(
-            Email: TestData.Users.User1.Email,
-            Password: TestData.Auth.DefaultPassword,
-            DeviceId: deviceId.ToString(),
-            DeviceName: "Test Device");
+            TestData.Users.User1.Email,
+            TestData.Auth.DefaultPassword,
+            deviceId.ToString(),
+            "Test Device");
 
         var authResult = await _service.AuthenticateAsync(request);
         Assert.True(authResult.IsSuccess, "Initial authentication failed");
@@ -141,10 +143,10 @@ public sealed class AuthServiceTests : IDisposable
         // Arrange
         var deviceId = Guid.NewGuid();
         var request = new AuthRequest(
-            Email: TestData.Users.User1.Email,
-            Password: TestData.Auth.DefaultPassword,
-            DeviceId: deviceId.ToString(),
-            DeviceName: "Test Device");
+            TestData.Users.User1.Email,
+            TestData.Auth.DefaultPassword,
+            deviceId.ToString(),
+            "Test Device");
 
         // Act
         var result = await _service.AuthenticateAsync(request);
@@ -171,10 +173,10 @@ public sealed class AuthServiceTests : IDisposable
         await AddTestDevice(TestData.Users.User1.Id, deviceId, oldLastActive);
 
         var request = new AuthRequest(
-            Email: TestData.Users.User1.Email,
-            Password: TestData.Auth.DefaultPassword,
-            DeviceId: deviceId.ToString(),
-            DeviceName: "Updated Device");
+            TestData.Users.User1.Email,
+            TestData.Auth.DefaultPassword,
+            deviceId.ToString(),
+            "Updated Device");
 
         // Act
         var result = await _service.AuthenticateAsync(request);
@@ -198,10 +200,5 @@ public sealed class AuthServiceTests : IDisposable
             PublicKey = new byte[32]
         });
         await _context.SaveChangesAsync();
-    }
-
-    public void Dispose()
-    {
-        _context.Dispose();
     }
 }

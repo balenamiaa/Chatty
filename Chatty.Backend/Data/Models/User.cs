@@ -1,3 +1,4 @@
+using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Models.Notifications;
 
 namespace Chatty.Backend.Data.Models;
@@ -12,6 +13,7 @@ public sealed class User
     public string? LastName { get; set; }
     public string? ProfilePictureUrl { get; set; }
     public string? StatusMessage { get; set; }
+    public UserStatus Status { get; set; }
     public DateTime? LastOnlineAt { get; set; }
     public string Locale { get; set; } = "en-US";
     public NotificationPreferences? NotificationPreferences { get; set; }

@@ -6,11 +6,9 @@ namespace Chatty.Shared.Models.Validation;
 
 public sealed class RequestPasswordResetRequestValidator : AbstractValidator<RequestPasswordResetRequest>
 {
-    public RequestPasswordResetRequestValidator()
-    {
+    public RequestPasswordResetRequestValidator() =>
         RuleFor(x => x.Email)
             .NotEmpty()
             .EmailAddress()
             .MaximumLength(255);
-    }
 }

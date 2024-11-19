@@ -17,8 +17,8 @@ public sealed class StickerService : IStickerService
     private const string StickerStoragePath = "stickers";
     private const int MaxStickerSize = 512;
     private readonly ChattyDbContext _context;
-    private readonly ILogger<StickerService> _logger;
     private readonly IEventBus _eventBus;
+    private readonly ILogger<StickerService> _logger;
 
     public StickerService(
         ChattyDbContext context,
@@ -81,7 +81,9 @@ public sealed class StickerService : IStickerService
             .FirstOrDefaultAsync(p => p.Id == packId, ct);
 
         if (pack is null)
+        {
             return Result<StickerDto>.Failure(Error.NotFound("Sticker pack not found"));
+        }
 
         try
         {
@@ -136,7 +138,9 @@ public sealed class StickerService : IStickerService
             .FirstOrDefaultAsync(s => s.Id == stickerId, ct);
 
         if (sticker is null)
+        {
             return Result<bool>.Success(true); // Already deleted
+        }
 
         try
         {
@@ -172,7 +176,9 @@ public sealed class StickerService : IStickerService
             .FirstOrDefaultAsync(p => p.Id == packId, ct);
 
         if (pack is null)
+        {
             return Result<bool>.Success(true); // Already deleted
+        }
 
         try
         {
@@ -210,7 +216,9 @@ public sealed class StickerService : IStickerService
             .FirstOrDefaultAsync(p => p.Id == packId, ct);
 
         if (pack is null)
+        {
             return Result<bool>.Failure(Error.NotFound("Sticker pack not found"));
+        }
 
         try
         {
@@ -243,13 +251,17 @@ public sealed class StickerService : IStickerService
             .FirstOrDefaultAsync(p => p.Id == packId, ct);
 
         if (pack is null)
+        {
             return Result<bool>.Failure(Error.NotFound("Sticker pack not found"));
+        }
 
         var server = await _context.Servers
             .FirstOrDefaultAsync(s => s.Id == serverId, ct);
 
         if (server is null)
+        {
             return Result<bool>.Failure(Error.NotFound("Server not found"));
+        }
 
         if (!pack.EnabledServers.Any(s => s.Id == serverId))
         {
@@ -270,7 +282,9 @@ public sealed class StickerService : IStickerService
             .FirstOrDefaultAsync(p => p.Id == packId, ct);
 
         if (pack is null)
+        {
             return Result<bool>.Failure(Error.NotFound("Sticker pack not found"));
+        }
 
         var server = pack.EnabledServers.FirstOrDefault(s => s.Id == serverId);
         if (server is not null)
@@ -318,14 +332,12 @@ public sealed class StickerService : IStickerService
             packs.Select(p => p.ToDto()).ToList());
     }
 
-    private static string GeneratePackId(string name)
-    {
+    private static string GeneratePackId(string name) =>
         // Convert name to lowercase, replace spaces with underscores
-        return name.ToLowerInvariant()
+        name.ToLowerInvariant()
             .Replace(" ", "_")
             .Replace("-", "_")
             .Replace(".", "_")
             .Replace("'", "")
             .Replace("\"", "");
-    }
 }

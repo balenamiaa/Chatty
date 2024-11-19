@@ -8,28 +8,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Chatty.Backend.Services.Background;
 
-public sealed class PresenceUpdateService : BackgroundService
+public sealed class PresenceUpdateService(
+    IServiceScopeFactory scopeFactory,
+    IConnectionTracker connectionTracker,
+    IEventBus eventBus,
+    ILogger<PresenceUpdateService> logger)
+    : BackgroundService
 {
-    private readonly IServiceScopeFactory _scopeFactory;
-    private readonly IConnectionTracker _connectionTracker;
-    private readonly IEventBus _eventBus;
-    private readonly ILogger<PresenceUpdateService> _logger;
     private readonly TimeSpan _interval = TimeSpan.FromSeconds(30);
     private readonly TimeSpan _offlineThreshold = TimeSpan.FromMinutes(5);
 
-    public PresenceUpdateService(
-        IServiceScopeFactory scopeFactory,
-        IConnectionTracker connectionTracker,
-        IEventBus eventBus,
-        ILogger<PresenceUpdateService> logger)
-    {
-        _scopeFactory = scopeFactory;
-        _connectionTracker = connectionTracker;
-        _eventBus = eventBus;
-        _logger = logger;
-    }
-
-    protected override async Task ExecuteAsync(CancellationToken ct)
+    protected async override Task ExecuteAsync(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {
@@ -40,7 +29,7 @@ public sealed class PresenceUpdateService : BackgroundService
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogError(ex, "Error occurred while updating presence states");
+                logger.LogError(ex, "Error occurred while updating presence states");
                 await Task.Delay(TimeSpan.FromSeconds(5), ct);
             }
         }
@@ -48,7 +37,7 @@ public sealed class PresenceUpdateService : BackgroundService
 
     private async Task UpdatePresenceStatesAsync(CancellationToken ct)
     {
-        using var scope = _scopeFactory.CreateScope();
+        using var scope = scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ChattyDbContext>();
 
         var cutoffTime = DateTime.UtcNow - _offlineThreshold;
@@ -61,7 +50,7 @@ public sealed class PresenceUpdateService : BackgroundService
         foreach (var user in inactiveUsers)
         {
             // Check if user is actually offline
-            var isOnline = await _connectionTracker.IsOnlineAsync(user.Id);
+            var isOnline = await connectionTracker.IsOnlineAsync(user.Id);
             if (!isOnline)
             {
                 // Update last seen time
@@ -69,24 +58,16 @@ public sealed class PresenceUpdateService : BackgroundService
                 user.UpdatedAt = DateTime.UtcNow;
 
                 // Publish offline event
-                await _eventBus.PublishAsync(
-                    new OnlineStateEvent(user.Id, false),
+                await eventBus.PublishAsync(
+                    new PresenceEvent(user.Id, UserStatus.Offline, user.StatusMessage),
                     ct);
-
-                // If user had a custom status, reset it
-                if (user.StatusMessage is not null)
-                {
-                    await _eventBus.PublishAsync(
-                        new PresenceEvent(user.Id, UserStatus.Offline, null),
-                        ct);
-                }
             }
         }
 
         if (inactiveUsers.Any())
         {
             await context.SaveChangesAsync(ct);
-            _logger.LogInformation("Updated presence state for {Count} users", inactiveUsers.Count);
+            logger.LogInformation("Updated presence state for {Count} users", inactiveUsers.Count);
         }
     }
 }

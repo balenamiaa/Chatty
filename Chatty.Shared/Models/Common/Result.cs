@@ -2,8 +2,8 @@ namespace Chatty.Shared.Models.Common;
 
 public readonly record struct Result<T>
 {
-    private readonly T? _value;
     private readonly Error? _error;
+    private readonly T? _value;
 
     private Result(T value)
     {
@@ -22,8 +22,12 @@ public readonly record struct Result<T>
     public bool IsSuccess { get; }
     public bool IsFailure => !IsSuccess;
 
-    public T Value => IsSuccess ? _value! : throw new InvalidOperationException("Cannot access Value when Result is failure");
-    public Error Error => !IsSuccess ? _error!.Value : throw new InvalidOperationException("Cannot access Error when Result is success");
+    public T Value =>
+        IsSuccess ? _value! : throw new InvalidOperationException("Cannot access Value when Result is failure");
+
+    public Error Error => !IsSuccess
+        ? _error!.Value
+        : throw new InvalidOperationException("Cannot access Error when Result is success");
 
     public static Result<T> Success(T value) => new(value);
     public static Result<T> Failure(Error error) => new(error);

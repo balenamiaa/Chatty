@@ -17,10 +17,10 @@ namespace Chatty.Backend.Services.Files;
 
 public sealed class FileService : IFileService
 {
+    private readonly string _basePath;
     private readonly ChattyDbContext _context;
     private readonly ILogger<FileService> _logger;
     private readonly StorageSettings _storageSettings;
-    private readonly string _basePath;
     private readonly string _thumbnailPath;
 
     public FileService(
@@ -48,15 +48,21 @@ public sealed class FileService : IFileService
     {
         // Validate file size
         if (request.FileSize > _storageSettings.MaxFileSize)
+        {
             return Result<AttachmentDto>.Failure(
                 Error.Validation($"File size exceeds maximum of {_storageSettings.MaxFileSize} bytes"));
+        }
 
         // Validate content type
         if (!_storageSettings.AllowedFileTypes.Contains(request.ContentType))
+        {
             return Result<AttachmentDto>.Failure(Error.Validation("File type not allowed"));
+        }
 
         if (!await ValidateFileTypeAsync(content, request.ContentType))
+        {
             return Result<AttachmentDto>.Failure(Error.Validation("Invalid file type"));
+        }
 
         try
         {
@@ -106,11 +112,15 @@ public sealed class FileService : IFileService
     {
         var attachment = await _context.Attachments.FindAsync([attachmentId], ct);
         if (attachment is null)
+        {
             return Result<Stream>.Failure(Error.NotFound("Attachment not found"));
+        }
 
         var filePath = Path.Combine(_storageSettings.BasePath, attachment.StoragePath);
         if (!File.Exists(filePath))
+        {
             return Result<Stream>.Failure(Error.NotFound("File not found"));
+        }
 
         try
         {
@@ -130,7 +140,9 @@ public sealed class FileService : IFileService
     {
         var attachment = await _context.Attachments.FindAsync([attachmentId], ct);
         if (attachment is null)
+        {
             return Result<bool>.Success(true); // Already deleted
+        }
 
         try
         {
@@ -181,10 +193,7 @@ public sealed class FileService : IFileService
         return Task.FromResult(Result<string>.Success(url));
     }
 
-    private static bool IsImage(string contentType)
-    {
-        return DetermineContentType(contentType) == ContentType.Image;
-    }
+    private static bool IsImage(string contentType) => DetermineContentType(contentType) == ContentType.Image;
 
     private async Task<string?> GenerateThumbnailAsync(
         string filePath,
@@ -213,9 +222,8 @@ public sealed class FileService : IFileService
         }
     }
 
-    private static ContentType DetermineContentType(string mimeType)
-    {
-        return mimeType.ToLowerInvariant() switch
+    private static ContentType DetermineContentType(string mimeType) =>
+        mimeType.ToLowerInvariant() switch
         {
             var mt when mt.StartsWith("image/") => ContentType.Image,
             var mt when mt.StartsWith("video/") => ContentType.Video,
@@ -224,7 +232,6 @@ public sealed class FileService : IFileService
             "text/plain" => ContentType.Text,
             _ => ContentType.File
         };
-    }
 
     private async Task<bool> ValidateFileTypeAsync(Stream content, string contentType)
     {

@@ -1,6 +1,7 @@
 using Chatty.Backend.Data;
 using Chatty.Backend.Realtime.Hubs;
 using Chatty.Shared.Models.Calls;
+using Chatty.Shared.Models.Channels;
 using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Models.Messages;
 using Chatty.Shared.Models.Servers;
@@ -14,9 +15,9 @@ namespace Chatty.Backend.Realtime.Events;
 
 public sealed class EventDispatcher(
     IHubContext<ChatHub, IChatHubClient> hubContext,
+    ChattyDbContext context,
     IConnectionTracker connectionTracker,
-    ILogger<EventDispatcher> logger,
-    ChattyDbContext context)
+    ILogger<EventDispatcher> logger)
     : IEventDispatcher
 {
     public async Task DispatchMessageReceivedAsync(Guid channelId, MessageDto message)
@@ -37,7 +38,7 @@ public sealed class EventDispatcher(
             foreach (var memberId in channelMembers)
             {
                 var connections = await connectionTracker.GetConnectionsAsync(memberId);
-                if (connections.Count > 0)
+                if (connections.Any())
                 {
                     await hubContext.Clients
                         .Clients(connections)
@@ -175,31 +176,8 @@ public sealed class EventDispatcher(
         }
     }
 
-    public async Task DispatchUserPresenceChangedAsync(Guid userId, UserStatus status, string? statusMessage)
-    {
-        try
-        {
-            await hubContext.Clients.All
-                .OnUserPresenceChanged(userId, status, statusMessage);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to dispatch user presence changed event");
-        }
-    }
-
-    public async Task DispatchUserOnlineStateChangedAsync(Guid userId, bool isOnline)
-    {
-        try
-        {
-            await hubContext.Clients.All
-                .OnUserOnlineStateChanged(userId, isOnline);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to dispatch user online state changed event");
-        }
-    }
+    public Task DispatchUserPresenceChangedAsync(Guid userId, UserStatus status, string? statusMessage) =>
+        hubContext.Clients.All.OnUserPresenceChanged(userId, status, statusMessage);
 
     public async Task DispatchCallStartedAsync(CallDto call)
     {
@@ -313,69 +291,49 @@ public sealed class EventDispatcher(
         }
     }
 
-    public async Task DispatchServerMemberJoinedAsync(Guid serverId, ServerMemberDto member)
-    {
-        try
-        {
-            await hubContext.Clients
-                .Group($"server_{serverId}")
-                .OnMemberJoined(serverId, member);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to dispatch server member joined event");
-        }
-    }
+    public Task DispatchChannelMemberJoinedAsync(Guid channelId, UserDto user) =>
+        hubContext.Clients
+            .Group($"channel_{channelId}")
+            .OnChannelMemberJoined(channelId, user);
 
-    public async Task DispatchServerMemberLeftAsync(Guid serverId, Guid userId)
-    {
-        try
-        {
-            await hubContext.Clients
-                .Group($"server_{serverId}")
-                .OnMemberLeft(serverId, userId);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to dispatch server member left event");
-        }
-    }
+    public Task DispatchChannelMemberLeftAsync(Guid channelId, Guid userId) =>
+        hubContext.Clients
+            .Group($"channel_{channelId}")
+            .OnChannelMemberLeft(channelId, userId);
 
-    public async Task DispatchServerMemberUpdatedAsync(Guid serverId, ServerMemberDto member)
-    {
-        try
-        {
-            await hubContext.Clients
-                .Group($"server_{serverId}")
-                .OnMemberUpdated(serverId, member);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to dispatch server member updated event");
-        }
-    }
+    public Task DispatchChannelMemberUpdatedAsync(Guid channelId, UserDto user) =>
+        hubContext.Clients
+            .Group($"channel_{channelId}")
+            .OnChannelMemberUpdated(channelId, user);
 
-    public async Task DispatchServerMemberKickedAsync(Guid serverId, Guid userId)
+    public Task DispatchServerMemberJoinedAsync(Guid serverId, ServerMemberDto member) =>
+        hubContext.Clients
+            .Group($"server_{serverId}")
+            .OnMemberJoined(serverId, member);
+
+    public Task DispatchServerMemberLeftAsync(Guid serverId, Guid userId) =>
+        hubContext.Clients
+            .Group($"server_{serverId}")
+            .OnMemberLeft(serverId, userId);
+
+    public Task DispatchServerMemberUpdatedAsync(Guid serverId, ServerMemberDto member) =>
+        hubContext.Clients
+            .Group($"server_{serverId}")
+            .OnMemberUpdated(serverId, member);
+
+    public Task DispatchServerMemberKickedAsync(Guid serverId, Guid userId)
     {
         try
         {
             // Notify server members
-            await hubContext.Clients
+            return hubContext.Clients
                 .Group($"server_{serverId}")
                 .OnMemberLeft(serverId, userId);
-
-            // Notify kicked user
-            var connections = await connectionTracker.GetConnectionsAsync(userId);
-            if (connections.Count > 0)
-            {
-                await hubContext.Clients
-                    .Clients(connections)
-                    .OnNotification("Server Kick", "You have been removed from the server");
-            }
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to dispatch server member kicked event");
+            return Task.CompletedTask;
         }
     }
 
@@ -393,84 +351,116 @@ public sealed class EventDispatcher(
         }
     }
 
-    public async Task DispatchMessageReactionAddedAsync(Guid channelId, Guid messageId, MessageReactionDto reaction)
-    {
-        try
-        {
-            await hubContext.Clients
-                .Group($"channel_{channelId}")
-                .OnMessageReactionAdded(channelId, messageId, reaction);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to dispatch message reaction added event");
-        }
-    }
+    public Task DispatchMessageReactionAddedAsync(Guid messageId, MessageReactionDto reaction) =>
+        hubContext.Clients
+            .Group($"message_{messageId}")
+            .OnMessageReactionAdded(null, messageId, reaction);
 
-    public async Task DispatchMessageReactionRemovedAsync(Guid channelId, Guid messageId, Guid reactionId, Guid userId)
-    {
-        try
-        {
-            await hubContext.Clients
-                .Group($"channel_{channelId}")
-                .OnMessageReactionRemoved(channelId, messageId, reactionId, userId);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to dispatch message reaction removed event");
-        }
-    }
+    public Task DispatchMessageReactionRemovedAsync(Guid channelId, Guid messageId, MessageReactionDto reaction) =>
+        hubContext.Clients
+            .Group($"message_{messageId}")
+            .OnMessageReactionRemoved(channelId, messageId, reaction.Id, reaction.User.Id);
 
-    public async Task DispatchDirectMessageReactionAddedAsync(Guid messageId, MessageReactionDto reaction)
-    {
-        try
-        {
-            var directMessage = await context.DirectMessages
-                .FirstOrDefaultAsync(m => m.Id == messageId);
+    public Task DispatchDirectMessageReactionAddedAsync(Guid messageId, MessageReactionDto reaction) =>
+        hubContext.Clients
+            .Group($"message_{messageId}")
+            .OnDirectMessageReactionAdded(messageId, reaction);
 
-            if (directMessage is not null)
-            {
-                await DispatchToUserAsync(directMessage.SenderId, client =>
-                    client.OnDirectMessageReactionAdded(messageId, reaction));
+    public Task DispatchDirectMessageReactionRemovedAsync(Guid messageId, Guid reactionId, Guid userId) =>
+        hubContext.Clients
+            .Group($"message_{messageId}")
+            .OnDirectMessageReactionRemoved(messageId, reactionId, userId);
 
-                await DispatchToUserAsync(directMessage.RecipientId, client =>
-                    client.OnDirectMessageReactionAdded(messageId, reaction));
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to dispatch direct message reaction added event");
-        }
-    }
+    public Task DispatchScreenShareStartedAsync(Guid callId, CallParticipantDto participant, string streamId) =>
+        hubContext.Clients
+            .Group($"call_{callId}")
+            .OnScreenShareStarted(callId, participant, streamId);
 
-    public async Task DispatchDirectMessageReactionRemovedAsync(Guid messageId, Guid reactionId, Guid userId)
-    {
-        try
-        {
-            var directMessage = await context.DirectMessages
-                .FirstOrDefaultAsync(m => m.Id == messageId);
+    public Task DispatchScreenShareStoppedAsync(Guid callId, CallParticipantDto participant) =>
+        hubContext.Clients
+            .Group($"call_{callId}")
+            .OnScreenShareStopped(callId, participant);
 
-            if (directMessage is not null)
-            {
-                await DispatchToUserAsync(directMessage.SenderId, client =>
-                    client.OnDirectMessageReactionRemoved(messageId, reactionId, userId));
+    public Task DispatchScreenShareChangedAsync(Guid callId, CallParticipantDto participant, bool isSharing) =>
+        hubContext.Clients
+            .Group($"call_{callId}")
+            .OnScreenShareChanged(callId, participant, isSharing);
 
-                await DispatchToUserAsync(directMessage.RecipientId, client =>
-                    client.OnDirectMessageReactionRemoved(messageId, reactionId, userId));
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to dispatch direct message reaction removed event");
-        }
-    }
+    public Task DispatchMemberRoleUpdatedAsync(Guid serverId, Guid userId, Guid roleId) =>
+        hubContext.Clients
+            .Group($"server_{serverId}")
+            .OnMemberRoleUpdated(serverId, userId, roleId);
+
+    public Task DispatchChannelCreatedAsync(Guid serverId, ChannelDto channel) =>
+        hubContext.Clients
+            .Group($"server_{serverId}")
+            .OnChannelCreated(serverId, channel);
+
+    public Task DispatchChannelUpdatedAsync(Guid serverId, ChannelDto channel) =>
+        hubContext.Clients
+            .Group($"server_{serverId}")
+            .OnChannelUpdated(serverId, channel);
+
+    public Task DispatchChannelDeletedAsync(Guid serverId, Guid channelId) =>
+        hubContext.Clients
+            .Group($"server_{serverId}")
+            .OnChannelDeleted(serverId, channelId);
+
+    public Task DispatchServerRoleCreatedAsync(Guid serverId, ServerRoleDto role) =>
+        hubContext.Clients
+            .Group($"server_{serverId}")
+            .OnRoleCreated(serverId, role);
+
+    public Task DispatchServerRoleUpdatedAsync(Guid serverId, ServerRoleDto role) =>
+        hubContext.Clients
+            .Group($"server_{serverId}")
+            .OnRoleUpdated(serverId, role);
+
+    public Task DispatchServerRoleDeletedAsync(Guid serverId, Guid roleId) =>
+        hubContext.Clients
+            .Group($"server_{serverId}")
+            .OnRoleDeleted(serverId, roleId);
+
+    public Task DispatchUserUpdatedAsync(Guid userId, UserDto user) =>
+        DispatchToUserAsync(userId, client => client.OnUserUpdated(userId, user));
+
+    public Task DispatchUserActivityChangedAsync(Guid userId, string activity) =>
+        DispatchToUserAsync(userId, client => client.OnUserActivityChanged(userId, activity));
+
+    public Task DispatchUserStreamingChangedAsync(Guid userId, bool isStreaming) =>
+        DispatchToUserAsync(userId, client => client.OnUserStreamingChanged(userId, isStreaming));
+
+    public Task DispatchMessagePinnedAsync(Guid channelId, MessageDto message) =>
+        hubContext.Clients
+            .Group($"channel_{channelId}")
+            .OnMessagePinned(channelId, message);
+
+    public Task DispatchMessageUnpinnedAsync(Guid channelId, Guid messageId) =>
+        hubContext.Clients
+            .Group($"channel_{channelId}")
+            .OnMessageUnpinned(channelId, messageId);
+
+    public Task DispatchMessageReplyAddedAsync(Guid messageId, MessageDto reply) =>
+        hubContext.Clients
+            .Group($"message_{messageId}")
+            .OnMessageReplied(messageId, reply);
+
+    public Task DispatchMessageReplyCountUpdatedAsync(Guid messageId, int replyCount) =>
+        hubContext.Clients
+            .Group($"message_{messageId}")
+            .OnReplyCountUpdated(messageId, replyCount);
+
+    public Task DispatchMessageReactionCountUpdatedAsync(Guid messageId, int reactionCount) =>
+        hubContext.Clients
+            .Group($"message_{messageId}")
+            .OnReactionCountUpdated(messageId, reactionCount);
 
     private async Task DispatchToUserAsync(Guid userId, Func<IChatHubClient, Task> dispatch)
     {
         try
         {
             var connections = await connectionTracker.GetConnectionsAsync(userId);
-            if (connections.Count > 0)
+            if (connections.Any())
             {
                 await dispatch(hubContext.Clients.Clients(connections));
             }

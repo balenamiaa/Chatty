@@ -1,5 +1,3 @@
-using Chatty.Shared.Models.Enums;
-
 namespace Chatty.Backend.Data.Models;
 
 public sealed class ServerRole

@@ -8,23 +8,21 @@ public sealed class CryptoProvider : ICryptoProvider
     private const int NonceSize = 12; // 96 bits for AES-GCM
     private const int TagSize = 16; // 128 bits for AES-GCM authentication tag
 
-    public byte[] GenerateKey()
-    {
-        return RandomNumberGenerator.GetBytes(32); // 256 bits
-    }
+    public byte[] GenerateKey() => RandomNumberGenerator.GetBytes(32); // 256 bits
 
-    public byte[] GenerateNonce()
-    {
-        return RandomNumberGenerator.GetBytes(NonceSize);
-    }
+    public byte[] GenerateNonce() => RandomNumberGenerator.GetBytes(NonceSize);
 
     public byte[] Encrypt(byte[] data, byte[] key, byte[] nonce)
     {
         if (key.Length != 32)
+        {
             throw new ArgumentException("Key must be 32 bytes", nameof(key));
+        }
 
         if (nonce.Length != NonceSize)
+        {
             throw new ArgumentException($"Nonce must be {NonceSize} bytes", nameof(nonce));
+        }
 
         using var aes = new AesGcm(key, TagSize);
         var ciphertext = new byte[data.Length];
@@ -43,13 +41,19 @@ public sealed class CryptoProvider : ICryptoProvider
     public byte[] Decrypt(byte[] data, byte[] key, byte[] nonce)
     {
         if (key.Length != 32)
+        {
             throw new ArgumentException("Key must be 32 bytes", nameof(key));
+        }
 
         if (nonce.Length != NonceSize)
+        {
             throw new ArgumentException($"Nonce must be {NonceSize} bytes", nameof(nonce));
+        }
 
         if (data.Length < TagSize)
+        {
             throw new ArgumentException("Data too short", nameof(data));
+        }
 
         using var aes = new AesGcm(key, TagSize);
 
@@ -81,8 +85,5 @@ public sealed class CryptoProvider : ICryptoProvider
         return sha256.ComputeHash(data);
     }
 
-    public string HashToString(byte[] data)
-    {
-        return Convert.ToHexString(Hash(data)).ToLowerInvariant();
-    }
+    public string HashToString(byte[] data) => Convert.ToHexString(Hash(data)).ToLowerInvariant();
 }

@@ -5,7 +5,6 @@ using Carter;
 using Chatty.Backend.Services.Users;
 using Chatty.Shared.Models.Users;
 
-using Microsoft.AspNetCore.Identity.Data;
 using Microsoft.AspNetCore.Mvc;
 
 using ResetPasswordRequest = Chatty.Shared.Models.Users.ResetPasswordRequest;
@@ -36,59 +35,60 @@ public sealed class UserModule : ICarterModule
 
         // Get current user
         group.MapGet("/me", async (
-            IUserService userService,
-            ClaimsPrincipal user,
-            CancellationToken ct) =>
-        {
-            var userId = Guid.Parse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-            var result = await userService.GetByIdAsync(userId, ct);
+                IUserService userService,
+                ClaimsPrincipal user,
+                CancellationToken ct) =>
+            {
+                var userId = Guid.Parse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+                var result = await userService.GetByIdAsync(userId, ct);
 
-            return result.IsSuccess
-                ? Results.Ok(result.Value)
-                : Results.Problem(
-                    title: result.Error.Code,
-                    detail: result.Error.Message,
-                    statusCode: StatusCodes.Status400BadRequest);
-        })
-        .RequireAuthorization();
+                return result.IsSuccess
+                    ? Results.Ok(result.Value)
+                    : Results.Problem(
+                        title: result.Error.Code,
+                        detail: result.Error.Message,
+                        statusCode: StatusCodes.Status400BadRequest);
+            })
+            .RequireAuthorization();
 
         // Update user
         group.MapPut("/me", async (
-            [FromBody] UpdateUserRequest request,
-            IUserService userService,
-            ClaimsPrincipal user,
-            CancellationToken ct) =>
-        {
-            var userId = Guid.Parse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-            var result = await userService.UpdateAsync(userId, request, ct);
+                [FromBody] UpdateUserRequest request,
+                IUserService userService,
+                ClaimsPrincipal user,
+                CancellationToken ct) =>
+            {
+                var userId = Guid.Parse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+                var result = await userService.UpdateAsync(userId, request, ct);
 
-            return result.IsSuccess
-                ? Results.Ok(result.Value)
-                : Results.Problem(
-                    title: result.Error.Code,
-                    detail: result.Error.Message,
-                    statusCode: StatusCodes.Status400BadRequest);
-        })
-        .RequireAuthorization();
+                return result.IsSuccess
+                    ? Results.Ok(result.Value)
+                    : Results.Problem(
+                        title: result.Error.Code,
+                        detail: result.Error.Message,
+                        statusCode: StatusCodes.Status400BadRequest);
+            })
+            .RequireAuthorization();
 
         // Change password
         group.MapPost("/me/change-password", async (
-            [FromBody] ChangePasswordRequest request,
-            IUserService userService,
-            ClaimsPrincipal user,
-            CancellationToken ct) =>
-        {
-            var userId = Guid.Parse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-            var result = await userService.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword, ct);
+                [FromBody] ChangePasswordRequest request,
+                IUserService userService,
+                ClaimsPrincipal user,
+                CancellationToken ct) =>
+            {
+                var userId = Guid.Parse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+                var result =
+                    await userService.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword, ct);
 
-            return result.IsSuccess
-                ? Results.NoContent()
-                : Results.Problem(
-                    title: result.Error.Code,
-                    detail: result.Error.Message,
-                    statusCode: StatusCodes.Status400BadRequest);
-        })
-        .RequireAuthorization();
+                return result.IsSuccess
+                    ? Results.NoContent()
+                    : Results.Problem(
+                        title: result.Error.Code,
+                        detail: result.Error.Message,
+                        statusCode: StatusCodes.Status400BadRequest);
+            })
+            .RequireAuthorization();
 
         // Request password reset
         group.MapPost("/reset-password/request", async (
@@ -112,7 +112,8 @@ public sealed class UserModule : ICarterModule
             IUserService userService,
             CancellationToken ct) =>
         {
-            var result = await userService.ResetPasswordAsync(request.Email, request.ResetToken, request.NewPassword, ct);
+            var result =
+                await userService.ResetPasswordAsync(request.Email, request.ResetToken, request.NewPassword, ct);
 
             return result.IsSuccess
                 ? Results.NoContent()

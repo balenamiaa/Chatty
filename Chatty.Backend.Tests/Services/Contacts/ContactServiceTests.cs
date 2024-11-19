@@ -34,6 +34,8 @@ public sealed class ContactServiceTests : IDisposable
         _sut = new ContactService(_context, logger, _eventBus.Object);
     }
 
+    public void Dispose() => TestDbContextFactory.Destroy(_context);
+
     [Fact]
     public async Task CreateAsync_WithValidRequest_CreatesContact()
     {
@@ -211,10 +213,5 @@ public sealed class ContactServiceTests : IDisposable
                 e.ContactUserId == TestData.Users.User2.Id &&
                 e.Contact.Status == ContactStatus.Blocked),
             It.IsAny<CancellationToken>()));
-    }
-
-    public void Dispose()
-    {
-        TestDbContextFactory.Destroy(_context);
     }
 }

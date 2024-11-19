@@ -58,8 +58,6 @@ public sealed class ConnectionTracker(ILogger<ConnectionTracker> logger) : IConn
         return Task.FromResult<IReadOnlyDictionary<Guid, IReadOnlyList<string>>>(result);
     }
 
-    public Task<bool> IsOnlineAsync(Guid userId)
-    {
-        return Task.FromResult(_connections.TryGetValue(userId, out var connections) && connections.Count > 0);
-    }
+    public Task<bool> IsOnlineAsync(Guid userId) =>
+        Task.FromResult(_connections.TryGetValue(userId, out var connections) && connections.Count > 0);
 }

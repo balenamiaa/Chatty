@@ -9,10 +9,10 @@ public sealed class MessageCleanupService(
     ILogger<MessageCleanupService> logger)
     : BackgroundService
 {
-    private readonly TimeSpan _interval = TimeSpan.FromHours(1);
     private readonly TimeSpan _deleteAfter = TimeSpan.FromDays(30);
+    private readonly TimeSpan _interval = TimeSpan.FromHours(1);
 
-    protected override async Task ExecuteAsync(CancellationToken ct)
+    protected async override Task ExecuteAsync(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {

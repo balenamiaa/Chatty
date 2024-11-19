@@ -23,8 +23,8 @@ public static class TestData
                 }
             }
         });
-
     }
+
     public static class Auth
     {
         public const string DefaultPassword = "password123";

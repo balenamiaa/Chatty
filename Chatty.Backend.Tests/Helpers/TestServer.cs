@@ -1,7 +1,4 @@
-using System.Net.Http;
-using System.Security.Claims;
 using System.Text;
-using System.Threading;
 
 using Chatty.Backend.Data;
 using Chatty.Backend.Infrastructure.Configuration;
@@ -15,22 +12,17 @@ using Chatty.Backend.Services.Messages;
 using Chatty.Backend.Services.Presence;
 using Chatty.Backend.Services.Servers;
 using Chatty.Backend.Services.Voice;
-using Chatty.Shared.Crypto;
-using Chatty.Shared.Models.Common;
 using Chatty.Shared.Models.Notifications;
 
 using FluentValidation;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 using Moq;
@@ -43,8 +35,6 @@ public sealed class TestServer : IAsyncDisposable
 {
     private readonly WebApplication _app;
     private readonly string _databaseName;
-
-    public IServiceProvider Services => _app.Services;
 
     public TestServer()
     {
@@ -72,62 +62,64 @@ public sealed class TestServer : IAsyncDisposable
             config.SetMinimumLevel(LogLevel.Debug);
         });
         _ = builder.Services.AddAuthentication(options =>
-        {
-            options.DefaultAuthenticateScheme = "Test";
-            options.DefaultChallengeScheme = "Test";
-        })
-        .AddJwtBearer("Test", options =>
-        {
-            options.RequireHttpsMetadata = false;
-            options.SaveToken = true;
-            options.TokenValidationParameters = new TokenValidationParameters
             {
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(
-                    Encoding.UTF8.GetBytes("super_secret_key_for_testing_only_do_not_use_in_production_123")),
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidIssuer = "chatty",
-                ValidAudience = "chatty-client",
-                ValidateLifetime = true,
-                ClockSkew = TimeSpan.Zero
-            };
-
-            options.Events = new JwtBearerEvents
+                options.DefaultAuthenticateScheme = "Test";
+                options.DefaultChallengeScheme = "Test";
+            })
+            .AddJwtBearer("Test", options =>
             {
-                OnMessageReceived = context =>
+                options.RequireHttpsMetadata = false;
+                options.SaveToken = true;
+                options.TokenValidationParameters = new TokenValidationParameters
                 {
-                    var accessToken = context.Request.Query["access_token"];
-                    if (string.IsNullOrEmpty(accessToken))
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(
+                        Encoding.UTF8.GetBytes("super_secret_key_for_testing_only_do_not_use_in_production_123")),
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidIssuer = "chatty",
+                    ValidAudience = "chatty-client",
+                    ValidateLifetime = true,
+                    ClockSkew = TimeSpan.Zero
+                };
+
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
                     {
-                        var authorization = context.Request.Headers["Authorization"].FirstOrDefault();
-                        if (!string.IsNullOrEmpty(authorization) && authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                        var accessToken = context.Request.Query["access_token"];
+                        if (string.IsNullOrEmpty(accessToken))
                         {
-                            accessToken = authorization.Substring("Bearer ".Length).Trim();
+                            var authorization = context.Request.Headers["Authorization"].FirstOrDefault();
+                            if (!string.IsNullOrEmpty(authorization) &&
+                                authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                            {
+                                accessToken = authorization.Substring("Bearer ".Length).Trim();
+                            }
                         }
-                    }
 
-                    var path = context.HttpContext.Request.Path;
-                    if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/chat"))
+                        var path = context.HttpContext.Request.Path;
+                        if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/chat"))
+                        {
+                            context.Token = accessToken;
+                        }
+
+                        return Task.CompletedTask;
+                    },
+                    OnAuthenticationFailed = context =>
                     {
-                        context.Token = accessToken;
+                        var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<TestServer>>();
+                        logger.LogError(context.Exception, "Authentication failed");
+                        return Task.CompletedTask;
+                    },
+                    OnTokenValidated = context =>
+                    {
+                        var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<TestServer>>();
+                        logger.LogInformation("Token validated successfully");
+                        return Task.CompletedTask;
                     }
-                    return Task.CompletedTask;
-                },
-                OnAuthenticationFailed = context =>
-                {
-                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<TestServer>>();
-                    logger.LogError(context.Exception, "Authentication failed");
-                    return Task.CompletedTask;
-                },
-                OnTokenValidated = context =>
-                {
-                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<TestServer>>();
-                    logger.LogInformation("Token validated successfully");
-                    return Task.CompletedTask;
-                }
-            };
-        });
+                };
+            });
         _ = builder.Services.AddAuthorization();
 
         // Add configuration
@@ -223,7 +215,9 @@ public sealed class TestServer : IAsyncDisposable
             {
                 var response = httpClient.GetAsync($"http://localhost:{port}/health").GetAwaiter().GetResult();
                 if (response.IsSuccessStatusCode)
+                {
                     break;
+                }
             }
             catch
             {
@@ -235,11 +229,7 @@ public sealed class TestServer : IAsyncDisposable
         }
     }
 
-    public Uri CreateUri(string relativePath)
-    {
-        var address = _app.Urls.First();
-        return new Uri($"{address}{relativePath}");
-    }
+    public IServiceProvider Services => _app.Services;
 
     public async ValueTask DisposeAsync()
     {
@@ -252,5 +242,11 @@ public sealed class TestServer : IAsyncDisposable
 
         await using var context = new ChattyDbContext(options);
         _ = await context.Database.EnsureDeletedAsync();
+    }
+
+    public Uri CreateUri(string relativePath)
+    {
+        var address = _app.Urls.First();
+        return new Uri($"{address}{relativePath}");
     }
 }

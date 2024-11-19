@@ -8,10 +8,7 @@ using Chatty.Backend.Infrastructure.Configuration;
 using Chatty.Backend.Infrastructure.Validation;
 using Chatty.Backend.Realtime.Hubs;
 
-using FluentValidation;
-
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.IdentityModel.Tokens;
 
 using Serilog;

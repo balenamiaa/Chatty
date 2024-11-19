@@ -25,7 +25,9 @@ public sealed class DeviceVerificationService(
             .FirstOrDefaultAsync(d => d.UserId == userId && d.DeviceId == deviceId, ct);
 
         if (device is null)
+        {
             throw new InvalidOperationException("Device not found");
+        }
 
         // Generate a 6-digit code
         var code = Random.Shared.Next(100000, 999999).ToString();
@@ -48,13 +50,19 @@ public sealed class DeviceVerificationService(
             .FirstOrDefaultAsync(d => d.UserId == userId && d.DeviceId == deviceId, ct);
 
         if (device is null)
+        {
             return false;
+        }
 
         if (!_pendingVerifications.TryGetValue((userId, deviceId), out var storedCode))
+        {
             return false;
+        }
 
         if (code != storedCode)
+        {
             return false;
+        }
 
         // Remove pending verification and mark device as verified
         _pendingVerifications.TryRemove((userId, deviceId), out _);
@@ -66,11 +74,9 @@ public sealed class DeviceVerificationService(
     public Task<bool> IsDeviceVerifiedAsync(
         Guid userId,
         Guid deviceId,
-        CancellationToken ct = default)
-    {
-        return Task.FromResult(
+        CancellationToken ct = default) =>
+        Task.FromResult(
             _verifiedDevices.TryGetValue((userId, deviceId), out var isVerified) && isVerified);
-    }
 
     public Task<bool> RevokeDeviceVerificationAsync(
         Guid userId,

@@ -1,6 +1,7 @@
 using Chatty.Backend.Data;
 using Chatty.Backend.Data.Models;
 using Chatty.Backend.Realtime.Events;
+using Chatty.Backend.Services.Channels;
 using Chatty.Backend.Services.Messages;
 using Chatty.Backend.Tests.Helpers;
 using Chatty.Shared.Crypto;
@@ -18,6 +19,7 @@ namespace Chatty.Backend.Tests.Services.Messages;
 
 public sealed class MessageReactionTests : IDisposable
 {
+    private readonly Mock<IChannelService> _channelService = new();
     private readonly IDbContextFactory<ChattyDbContext> _contextFactory;
     private readonly Mock<IEventBus> _eventBus;
     private readonly MessageService _sut;
@@ -34,6 +36,7 @@ public sealed class MessageReactionTests : IDisposable
             _contextFactory,
             _eventBus.Object,
             crypto.Object,
+            _channelService.Object,
             logger.Object,
             limitSettings);
     }
@@ -376,7 +379,7 @@ public sealed class MessageReactionTests : IDisposable
             messageId,
             userId,
             ReactionType.Custom,
-            customEmoji: null);
+            null);
 
         // Assert
         Assert.False(result.IsSuccess);
@@ -396,7 +399,7 @@ public sealed class MessageReactionTests : IDisposable
             message.Id,
             userId,
             ReactionType.Custom,
-            customEmoji: null);
+            null);
 
         // Assert
         Assert.False(result.IsSuccess);
@@ -406,8 +409,10 @@ public sealed class MessageReactionTests : IDisposable
     private static async Task<Guid> CreateTestMessageAsync(ChattyDbContext context)
     {
         // Create users if they don't exist
-        var user1 = await context.Users.FindAsync(TestData.Users.User1.Id) ?? context.Users.Add(TestData.Users.User1).Entity;
-        var user2 = await context.Users.FindAsync(TestData.Users.User2.Id) ?? context.Users.Add(TestData.Users.User2).Entity;
+        var user1 = await context.Users.FindAsync(TestData.Users.User1.Id) ??
+                    context.Users.Add(TestData.Users.User1).Entity;
+        var user2 = await context.Users.FindAsync(TestData.Users.User2.Id) ??
+                    context.Users.Add(TestData.Users.User2).Entity;
         await context.SaveChangesAsync();
 
         var channel = new Channel
@@ -453,8 +458,10 @@ public sealed class MessageReactionTests : IDisposable
     private static async Task<DirectMessage> CreateTestDirectMessageAsync(ChattyDbContext context)
     {
         // Create users if they don't exist
-        var user1 = await context.Users.FindAsync(TestData.Users.User1.Id) ?? context.Users.Add(TestData.Users.User1).Entity;
-        var user2 = await context.Users.FindAsync(TestData.Users.User2.Id) ?? context.Users.Add(TestData.Users.User2).Entity;
+        var user1 = await context.Users.FindAsync(TestData.Users.User1.Id) ??
+                    context.Users.Add(TestData.Users.User1).Entity;
+        var user2 = await context.Users.FindAsync(TestData.Users.User2.Id) ??
+                    context.Users.Add(TestData.Users.User2).Entity;
         await context.SaveChangesAsync();
 
         var message = new DirectMessage

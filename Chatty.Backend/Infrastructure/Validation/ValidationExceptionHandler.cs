@@ -4,15 +4,8 @@ using Microsoft.AspNetCore.Diagnostics;
 
 namespace Chatty.Backend.Infrastructure.Validation;
 
-public sealed class ValidationExceptionHandler : IExceptionHandler
+public sealed class ValidationExceptionHandler(ILogger<ValidationExceptionHandler> logger) : IExceptionHandler
 {
-    private readonly ILogger<ValidationExceptionHandler> _logger;
-
-    public ValidationExceptionHandler(ILogger<ValidationExceptionHandler> logger)
-    {
-        _logger = logger;
-    }
-
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
         Exception exception,
@@ -23,7 +16,7 @@ public sealed class ValidationExceptionHandler : IExceptionHandler
             return false;
         }
 
-        _logger.LogWarning(
+        logger.LogWarning(
             "Validation error occurred: {Message}",
             validationException.Message);
 

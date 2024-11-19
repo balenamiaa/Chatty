@@ -552,6 +552,18 @@ CREATE TABLE call_participants (
 CREATE INDEX idx_call_participants_call ON call_participants(call_id);
 CREATE INDEX idx_call_participants_user ON call_participants(user_id);
 
+-- Presence Subscriptions Table
+CREATE TABLE presence_subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subscriber_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    target_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (subscriber_id, target_user_id)
+);
+
+CREATE INDEX idx_presence_subscriptions_subscriber ON presence_subscriptions(subscriber_id);
+CREATE INDEX idx_presence_subscriptions_target ON presence_subscriptions(target_user_id);
+
 -- Function to update updated_at timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$

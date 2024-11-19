@@ -126,5 +126,7 @@ public sealed class KeyModule : ICarterModule
 }
 
 public record CreateBackupRequest(string MasterKey);
+
 public record RestoreBackupRequest(string BackupData);
+
 public record VerifyBackupRequest(string BackupData);

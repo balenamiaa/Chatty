@@ -19,7 +19,7 @@ public sealed class CreateCallRequestValidator : AbstractValidator<CreateCallReq
             .WithMessage("Either ChannelId or RecipientId must be provided");
 
         RuleFor(x => x)
-            .Must(x => (x.ChannelId is null) != (x.RecipientId is null))
+            .Must(x => x.ChannelId is null != x.RecipientId is null)
             .WithMessage("Exactly one of ChannelId or RecipientId must be provided");
     }
 }

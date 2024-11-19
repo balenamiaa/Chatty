@@ -18,7 +18,6 @@ public sealed class PresenceService(
     ILogger<PresenceService> logger)
     : IPresenceService
 {
-    private static readonly ConcurrentDictionary<Guid, HashSet<Guid>> _subscriptions = new();
     private static readonly ConcurrentDictionary<Guid, (UserStatus Status, string? Message)> _userStatuses = new();
 
     public async Task<Result<bool>> UpdateStatusAsync(
@@ -39,7 +38,9 @@ public sealed class PresenceService(
             await using var context = await contextFactory.CreateDbContextAsync(ct);
             var user = await context.Users.FindAsync([userId], ct);
             if (user is null)
+            {
                 return Result<bool>.Failure(Error.NotFound("User not found"));
+            }
 
             user.StatusMessage = statusMessage;
             user.UpdatedAt = DateTime.UtcNow;
@@ -74,7 +75,9 @@ public sealed class PresenceService(
                 .FirstOrDefaultAsync(u => u.Id == userId, ct);
 
             if (user is null)
+            {
                 return Result<bool>.Failure(Error.NotFound("User not found"));
+            }
 
             var previousLastSeen = user.LastOnlineAt;
             var wasOnline = previousLastSeen >= DateTime.UtcNow.AddMinutes(-5);
@@ -93,16 +96,9 @@ public sealed class PresenceService(
                 try
                 {
                     await eventBus.PublishAsync(
-                        new OnlineStateEvent(userId, isOnline),
+                        new PresenceEvent(userId, isOnline ? UserStatus.Online : UserStatus.Offline,
+                            user.StatusMessage),
                         ct);
-
-                    // If going offline and had a custom status, reset it
-                    if (!isOnline && _userStatuses.TryGetValue(userId, out _))
-                    {
-                        await eventBus.PublishAsync(
-                            new PresenceEvent(userId, UserStatus.Offline, null),
-                            ct);
-                    }
                 }
                 catch (Exception ex)
                 {
@@ -118,7 +114,9 @@ public sealed class PresenceService(
         catch (ObjectDisposedException)
         {
             // Log and swallow ObjectDisposedException during cleanup
-            logger.LogDebug("Context disposed while updating last seen for user {UserId}. This is expected during cleanup.", userId);
+            logger.LogDebug(
+                "Context disposed while updating last seen for user {UserId}. This is expected during cleanup.",
+                userId);
             return Result<bool>.Success(true);
         }
         catch (Exception ex)
@@ -187,58 +185,6 @@ public sealed class PresenceService(
         {
             logger.LogError(ex, "Failed to get status for multiple users");
             return Result<IReadOnlyDictionary<Guid, UserStatus>>.Failure(Error.Internal("Failed to get user statuses"));
-        }
-    }
-
-    public Task<Result<bool>> SubscribeToPresenceUpdatesAsync(
-        Guid subscriberId,
-        IEnumerable<Guid> userIds,
-        CancellationToken ct = default)
-    {
-        try
-        {
-            foreach (var userId in userIds)
-            {
-                var subscribers = _subscriptions.GetOrAdd(userId, _ => []);
-                lock (subscribers)
-                {
-                    subscribers.Add(subscriberId);
-                }
-            }
-
-            return Task.FromResult(Result<bool>.Success(true));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to subscribe to presence updates");
-            return Task.FromResult(Result<bool>.Failure(Error.Internal("Failed to subscribe")));
-        }
-    }
-
-    public Task<Result<bool>> UnsubscribeFromPresenceUpdatesAsync(
-        Guid subscriberId,
-        IEnumerable<Guid> userIds,
-        CancellationToken ct = default)
-    {
-        try
-        {
-            foreach (var userId in userIds)
-            {
-                if (_subscriptions.TryGetValue(userId, out var subscribers))
-                {
-                    lock (subscribers)
-                    {
-                        subscribers.Remove(subscriberId);
-                    }
-                }
-            }
-
-            return Task.FromResult(Result<bool>.Success(true));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to unsubscribe from presence updates");
-            return Task.FromResult(Result<bool>.Failure(Error.Internal("Failed to unsubscribe")));
         }
     }
 }

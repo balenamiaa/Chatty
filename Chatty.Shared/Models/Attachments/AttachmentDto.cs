@@ -12,3 +12,5 @@ public sealed record AttachmentDto(
     byte[] EncryptionKey,
     byte[] EncryptionIv,
     DateTime CreatedAt);
+
+public sealed record AttachmentUrlDto(string Url);

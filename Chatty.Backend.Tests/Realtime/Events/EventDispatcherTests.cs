@@ -8,7 +8,6 @@ using Chatty.Backend.Realtime.Events;
 using Chatty.Backend.Realtime.Hubs;
 using Chatty.Backend.Tests.Helpers;
 using Chatty.Shared.Models.Enums;
-using Chatty.Shared.Models.Messages;
 using Chatty.Shared.Realtime.Hubs;
 
 using Microsoft.AspNetCore.SignalR;
@@ -22,9 +21,9 @@ namespace Chatty.Backend.Tests.Realtime.Events;
 
 public sealed class EventDispatcherTests : IDisposable
 {
+    private readonly Mock<IConnectionTracker> _connectionTracker;
     private readonly ChattyDbContext _context;
     private readonly Mock<IHubContext<ChatHub, IChatHubClient>> _hubContext;
-    private readonly Mock<IConnectionTracker> _connectionTracker;
     private readonly Mock<ILogger<EventDispatcher>> _logger;
     private readonly EventDispatcher _sut;
 
@@ -37,12 +36,14 @@ public sealed class EventDispatcherTests : IDisposable
 
         _sut = new EventDispatcher(
             _hubContext.Object,
+            _context,
             _connectionTracker.Object,
-            _logger.Object,
-            _context);
+            _logger.Object);
 
         SetupTestData();
     }
+
+    public void Dispose() => TestDbContextFactory.Destroy(_context);
 
     [Fact]
     public async Task DispatchMessageReceivedAsync_NotifiesChannelAndMembers()
@@ -53,7 +54,7 @@ public sealed class EventDispatcherTests : IDisposable
         var connectionId = "connection1";
 
         _connectionTracker.Setup(x => x.GetConnectionsAsync(It.IsAny<Guid>()))
-            .ReturnsAsync(new[] { connectionId });
+            .ReturnsAsync([connectionId]);
 
         // Mock the hub context clients
         var mockClients = new Mock<IHubClients<IChatHubClient>>();
@@ -81,8 +82,8 @@ public sealed class EventDispatcherTests : IDisposable
         // Assert
         mockClientProxy.Verify(x => x.OnMessageReceived(channelId, message), Times.Once);
         mockClientProxy.Verify(x => x.OnNotification(
-            "New Message",
-            $"New message in channel from {message.Sender.Username}"),
+                "New Message",
+                $"New message in channel from {message.Sender.Username}"),
             Times.Once);
     }
 
@@ -128,11 +129,6 @@ public sealed class EventDispatcherTests : IDisposable
         _context.Channels.Add(TestData.Channel1);
         _context.Messages.Add(TestData.Message1);
         _context.SaveChanges();
-    }
-
-    public void Dispose()
-    {
-        TestDbContextFactory.Destroy(_context);
     }
 
     private static class TestData

@@ -63,7 +63,7 @@ public sealed class KeyRotationServiceTests
         // Arrange
         var userId = Guid.NewGuid();
         var oldKey = await _sut.GetCurrentKeyAsync(userId);
-        var newKey = (byte[])[1, 2, 3, .. new byte[32 - 3]]; // Different key
+        var newKey = (byte[]) [1, 2, 3, .. new byte[32 - 3]]; // Different key
         _crypto.Setup(x => x.GenerateKey()).Returns(newKey);
 
         // Act
@@ -81,7 +81,7 @@ public sealed class KeyRotationServiceTests
         // Arrange
         var userId = Guid.NewGuid();
         var firstKey = await _sut.GetCurrentKeyAsync(userId);
-        var secondKey = (byte[])[1, 2, 3, .. new byte[32 - 3]];
+        var secondKey = (byte[]) [1, 2, 3, .. new byte[32 - 3]];
         _crypto.Setup(x => x.GenerateKey()).Returns(secondKey);
         await _sut.RotateKeyAsync(userId);
 
@@ -112,7 +112,7 @@ public sealed class KeyRotationServiceTests
         // Arrange
         var userId = Guid.NewGuid();
         var firstKey = await _sut.GetCurrentKeyAsync(userId);
-        var secondKey = (byte[])[1, 2, 3, .. new byte[32 - 3]];
+        var secondKey = (byte[]) [1, 2, 3, .. new byte[32 - 3]];
         _crypto.Setup(x => x.GenerateKey()).Returns(secondKey);
         await _sut.RotateKeyAsync(userId);
 
@@ -131,7 +131,7 @@ public sealed class KeyRotationServiceTests
         // Arrange
         var userId = Guid.NewGuid();
         await _sut.GetCurrentKeyAsync(userId);
-        var secondKey = (byte[])[1, 2, 3, .. new byte[32 - 3]];
+        var secondKey = (byte[]) [1, 2, 3, .. new byte[32 - 3]];
         _crypto.Setup(x => x.GenerateKey()).Returns(secondKey);
         await _sut.RotateKeyAsync(userId);
 

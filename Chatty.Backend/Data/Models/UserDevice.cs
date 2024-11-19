@@ -1,6 +1,7 @@
 using Chatty.Shared.Models.Enums;
 
 namespace Chatty.Backend.Data.Models;
+
 public sealed class UserDevice
 {
     public Guid Id { get; set; }

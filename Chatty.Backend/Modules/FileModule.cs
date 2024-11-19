@@ -46,10 +46,12 @@ public sealed class FileModule : ICarterModule
             var result = await fileService.DownloadAsync(attachmentId, ct);
 
             if (!result.IsSuccess)
+            {
                 return Results.Problem(
                     title: result.Error.Code,
                     detail: result.Error.Message,
                     statusCode: StatusCodes.Status400BadRequest);
+            }
 
             return Results.File(
                 result.Value,

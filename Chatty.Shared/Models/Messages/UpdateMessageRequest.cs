@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 using ContentType = Chatty.Shared.Models.Enums.ContentType;
 
 namespace Chatty.Shared.Models.Messages;

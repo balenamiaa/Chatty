@@ -55,18 +55,20 @@ public sealed class ChannelServiceTests : IDisposable
         SetupTestData();
     }
 
+    public void Dispose() => TestDbContextFactory.Destroy(_context);
+
     [Fact]
     public async Task CreateAsync_WithValidRequest_CreatesChannel()
     {
         // Arrange
         var server = await CreateTestServer();
         var request = new CreateChannelRequest(
-          Name: "test-channel",
-          Topic: "Test Channel",
-          IsPrivate: false,
-          ChannelType: ChannelType.Text,
-          Position: 0,
-          RateLimitPerUser: 0);
+            "test-channel",
+            "Test Channel",
+            false,
+            ChannelType.Text,
+            0,
+            0);
 
         // Act
         var result = await _sut.CreateAsync(server.Id, request);
@@ -77,11 +79,11 @@ public sealed class ChannelServiceTests : IDisposable
         Assert.Equal(request.ChannelType, result.Value.ChannelType);
 
         _eventBus.Verify(x => x.PublishAsync(
-            It.Is<ChannelCreatedEvent>(e =>
-              e.ServerId == server.Id &&
-              e.Channel.Id == result.Value.Id),
-            It.IsAny<CancellationToken>()),
-          Times.Once);
+                It.Is<ChannelCreatedEvent>(e =>
+                    e.ServerId == server.Id &&
+                    e.Channel.Id == result.Value.Id),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
@@ -97,7 +99,7 @@ public sealed class ChannelServiceTests : IDisposable
         // Assert
         Assert.True(result.IsSuccess);
         var membership = await _context.ChannelMembers
-          .FirstOrDefaultAsync(m => m.ChannelId == channel.Id && m.UserId == userId);
+            .FirstOrDefaultAsync(m => m.ChannelId == channel.Id && m.UserId == userId);
         Assert.NotNull(membership);
     }
 
@@ -107,10 +109,10 @@ public sealed class ChannelServiceTests : IDisposable
         // Arrange
         var channel = await CreateTestChannel();
         var request = new UpdateChannelRequest(
-          Name: "updated-channel",
-          Topic: "Updated Channel",
-          Position: 1,
-          RateLimitPerUser: 5);
+            "updated-channel",
+            "Updated Channel",
+            1,
+            5);
 
         // Act
         var result = await _sut.UpdateAsync(channel.Id, request);
@@ -127,7 +129,7 @@ public sealed class ChannelServiceTests : IDisposable
         // Arrange
         var server = await CreateTestServer();
         var channels = new List<Channel>();
-        for (int i = 0; i < 3; i++)
+        for (var i = 0; i < 3; i++)
         {
             channels.Add(new Channel
             {
@@ -137,6 +139,7 @@ public sealed class ChannelServiceTests : IDisposable
                 ChannelType = ChannelType.Text
             });
         }
+
         _context.Channels.AddRange(channels);
         await _context.SaveChangesAsync();
 
@@ -165,11 +168,11 @@ public sealed class ChannelServiceTests : IDisposable
             Position = 0,
             Permissions =
             [
-                new() { Permission = PermissionType.ViewChannels },
-                new() { Permission = PermissionType.SendMessages },
-                new() { Permission = PermissionType.ReadMessageHistory },
-                new() { Permission = PermissionType.Connect },
-                new() { Permission = PermissionType.Speak }
+                new ServerRolePermission { Permission = PermissionType.ViewChannels },
+                new ServerRolePermission { Permission = PermissionType.SendMessages },
+                new ServerRolePermission { Permission = PermissionType.ReadMessageHistory },
+                new ServerRolePermission { Permission = PermissionType.Connect },
+                new ServerRolePermission { Permission = PermissionType.Speak }
             ]
         };
 
@@ -206,11 +209,6 @@ public sealed class ChannelServiceTests : IDisposable
     {
         _context.Users.AddRange(TestData.User1, TestData.User2);
         _context.SaveChanges();
-    }
-
-    public void Dispose()
-    {
-        TestDbContextFactory.Destroy(_context);
     }
 
     private static class TestData

@@ -1,7 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using System.Threading;
 
 using Chatty.Backend.Data;
 using Chatty.Backend.Data.Models;
@@ -23,19 +22,21 @@ namespace Chatty.Backend.Tests.Realtime.Integration;
 
 public sealed class ChatHubIntegrationTests : IAsyncLifetime, IAsyncDisposable
 {
-    private readonly TestServer _server;
     private readonly ChattyDbContext _context;
+    private readonly TestServer _server;
+    private Channel? _channel;
     private HubConnection? _connection1;
     private HubConnection? _connection2;
     private User? _user1;
     private User? _user2;
-    private Channel? _channel;
 
     public ChatHubIntegrationTests()
     {
         _server = new TestServer();
         _context = _server.Services.GetRequiredService<ChattyDbContext>();
     }
+
+    async ValueTask IAsyncDisposable.DisposeAsync() => await Dispose();
 
     public async Task InitializeAsync()
     {
@@ -86,6 +87,7 @@ public sealed class ChatHubIntegrationTests : IAsyncLifetime, IAsyncDisposable
             {
                 Console.WriteLine($"Connection 1 closed with error: {ex.Message}");
             }
+
             return Task.CompletedTask;
         };
 
@@ -95,6 +97,7 @@ public sealed class ChatHubIntegrationTests : IAsyncLifetime, IAsyncDisposable
             {
                 Console.WriteLine($"Connection 2 closed with error: {ex.Message}");
             }
+
             return Task.CompletedTask;
         };
 
@@ -110,8 +113,8 @@ public sealed class ChatHubIntegrationTests : IAsyncLifetime, IAsyncDisposable
             var timeout = TimeSpan.FromSeconds(10);
             using var cts = new CancellationTokenSource(timeout);
             while ((_connection1.State != HubConnectionState.Connected ||
-                _connection2.State != HubConnectionState.Connected) &&
-                !cts.Token.IsCancellationRequested)
+                    _connection2.State != HubConnectionState.Connected) &&
+                   !cts.Token.IsCancellationRequested)
             {
                 await Task.Delay(100, cts.Token);
             }
@@ -128,32 +131,20 @@ public sealed class ChatHubIntegrationTests : IAsyncLifetime, IAsyncDisposable
         }
     }
 
+    public async Task DisposeAsync() => await Dispose();
+
     private void RegisterEventHandlers(HubConnection connection)
     {
-        connection.On<Guid, UserDto>("OnTypingStarted", (channelId, user) =>
-        {
-            return Task.CompletedTask;
-        });
+        connection.On<Guid, UserDto>("OnTypingStarted", (channelId, user) => { return Task.CompletedTask; });
 
-        connection.On<Guid, MessageDto>("OnMessageReceived", (channelId, message) =>
-        {
-            return Task.CompletedTask;
-        });
+        connection.On<Guid, MessageDto>("OnMessageReceived", (channelId, message) => { return Task.CompletedTask; });
 
-        connection.On<string, string>("OnNotification", (title, message) =>
-        {
-            return Task.CompletedTask;
-        });
+        connection.On<string, string>("OnNotification", (title, message) => { return Task.CompletedTask; });
 
-        connection.On<Guid, UserStatus, string>("OnUserPresenceChanged", (userId, status, message) =>
-        {
-            return Task.CompletedTask;
-        });
+        connection.On<Guid, UserStatus, string>("OnUserPresenceChanged",
+            (userId, status, message) => { return Task.CompletedTask; });
 
-        connection.On<Guid, bool>("OnUserOnlineStateChanged", (userId, isOnline) =>
-        {
-            return Task.CompletedTask;
-        });
+        connection.On<Guid, bool>("OnUserOnlineStateChanged", (userId, isOnline) => { return Task.CompletedTask; });
     }
 
     private HubConnection CreateHubConnection(Guid userId)
@@ -181,15 +172,15 @@ public sealed class ChatHubIntegrationTests : IAsyncLifetime, IAsyncDisposable
         var key = Encoding.UTF8.GetBytes("super_secret_key_for_testing_only_do_not_use_in_production_123");
         var tokenDescriptor = new SecurityTokenDescriptor
         {
-            Subject = new ClaimsIdentity(new[]
-            {
+            Subject = new ClaimsIdentity([
                 new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
-                new Claim(ClaimTypes.Name, userId.ToString()),
-            }),
+                new Claim(ClaimTypes.Name, userId.ToString())
+            ]),
             Expires = DateTime.UtcNow.AddHours(1),
             Issuer = "chatty",
             Audience = "chatty-client",
-            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+            SigningCredentials =
+                new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
         };
         var token = tokenHandler.CreateToken(tokenDescriptor);
         return tokenHandler.WriteToken(token);
@@ -220,11 +211,11 @@ public sealed class ChatHubIntegrationTests : IAsyncLifetime, IAsyncDisposable
 
         var messageService = _server.Services.GetRequiredService<IMessageService>();
         var message = new CreateMessageRequest(
-            ChannelId: _channel.Id,
-            Content: System.Text.Encoding.UTF8.GetBytes("Test message"),
-            ContentType: ContentType.Text,
-            MessageNonce: new byte[24],
-            KeyVersion: 1,
+            _channel.Id,
+            Encoding.UTF8.GetBytes("Test message"),
+            ContentType.Text,
+            new byte[24],
+            1,
             Attachments: null
         );
 
@@ -286,6 +277,7 @@ public sealed class ChatHubIntegrationTests : IAsyncLifetime, IAsyncDisposable
                     offlineReceived.SetResult((userId, isOnline));
                 }
             }
+
             return Task.CompletedTask;
         });
 
@@ -306,9 +298,15 @@ public sealed class ChatHubIntegrationTests : IAsyncLifetime, IAsyncDisposable
         {
             // Ensure connections are properly cleaned up even if test fails
             if (_connection1?.State == HubConnectionState.Connected)
+            {
                 await _connection1.StopAsync();
+            }
+
             if (_connection2?.State == HubConnectionState.Connected)
+            {
                 await _connection2.StopAsync();
+            }
+
             throw;
         }
     }
@@ -320,26 +318,19 @@ public sealed class ChatHubIntegrationTests : IAsyncLifetime, IAsyncDisposable
             await _connection1.DisposeAsync();
             _connection1 = null;
         }
+
         if (_connection2 != null)
         {
             await _connection2.DisposeAsync();
             _connection2 = null;
         }
+
         if (_context != null)
         {
             await _context.Database.EnsureDeletedAsync();
             await _context.DisposeAsync();
         }
+
         await _server.DisposeAsync();
-    }
-
-    async ValueTask IAsyncDisposable.DisposeAsync()
-    {
-        await Dispose();
-    }
-
-    public async Task DisposeAsync()
-    {
-        await Dispose();
     }
 }

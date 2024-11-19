@@ -4,7 +4,7 @@ namespace Chatty.Shared.Models.Channels;
 
 public sealed record ChannelDto(
     Guid Id,
-    Guid? ServerId,
+    Guid ServerId,
     string Name,
     string? Topic,
     bool IsPrivate,

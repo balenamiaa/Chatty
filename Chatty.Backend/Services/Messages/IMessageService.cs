@@ -1,4 +1,3 @@
-using Chatty.Backend.Services.Common;
 using Chatty.Shared.Models.Common;
 using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Models.Messages;
@@ -65,7 +64,53 @@ public interface IMessageService
         Guid userId,
         CancellationToken ct = default);
 
+    Task<Result<bool>> ReplyAsync(Guid messageId, Guid userId, ReplyMessageRequest request,
+        CancellationToken ct = default);
+
+    Task<Result<bool>> PinMessageAsync(Guid channelId, Guid messageId, Guid userId, CancellationToken ct = default);
+    Task<Result<bool>> UnpinMessageAsync(Guid channelId, Guid messageId, Guid userId, CancellationToken ct = default);
+
     Task<Result<IReadOnlyList<MessageReactionDto>>> GetDirectMessageReactionsAsync(
         Guid messageId,
+        CancellationToken ct = default);
+
+    // Message retrieval operations
+    Task<Result<MessageDto>> GetChannelMessageAsync(
+        Guid messageId,
+        CancellationToken ct = default);
+
+    Task<Result<IReadOnlyList<MessageReactionDto>>> GetMessageReactionsAsync(
+        Guid messageId,
+        CancellationToken ct = default);
+
+    Task<Result<IReadOnlyList<MessageReactionDto>>> GetMessageReactionsByTypeAsync(
+        Guid messageId,
+        ReactionType type,
+        CancellationToken ct = default);
+
+    Task<Result<IReadOnlyList<MessageDto>>> GetMessageRepliesAsync(
+        Guid messageId,
+        int limit,
+        DateTime? before,
+        CancellationToken ct = default);
+
+    Task<Result<int>> GetMessageReplyCountAsync(
+        Guid messageId,
+        CancellationToken ct = default);
+
+    Task<Result<MessageReactionDto?>> GetUserReactionAsync(
+        Guid messageId,
+        Guid userId,
+        CancellationToken ct = default);
+
+    Task<Result<MessageDto>> GetParentMessageAsync(
+        Guid messageId,
+        CancellationToken ct = default);
+
+    Task<Result<IReadOnlyList<MessageDto>>> GetUserMentionsAsync(
+        Guid userId,
+        int limit,
+        DateTime? before = null,
+        DateTime? after = null,
         CancellationToken ct = default);
 }

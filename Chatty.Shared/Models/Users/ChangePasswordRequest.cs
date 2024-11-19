@@ -1,5 +1,8 @@
+using MessagePack;
+
 namespace Chatty.Shared.Models.Users;
 
+[MessagePackObject]
 public sealed record ChangePasswordRequest(
-    string CurrentPassword,
-    string NewPassword);
+    [property: Key(0)] string CurrentPassword,
+    [property: Key(1)] string NewPassword);

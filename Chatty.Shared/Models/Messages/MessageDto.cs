@@ -1,7 +1,4 @@
-using System.Net.Mime;
-
 using Chatty.Shared.Models.Attachments;
-using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Models.Users;
 
 using ContentType = Chatty.Shared.Models.Enums.ContentType;
@@ -10,7 +7,7 @@ namespace Chatty.Shared.Models.Messages;
 
 public record MessageDto(
     Guid Id,
-    Guid ChannelId,
+    Guid? ChannelId,
     UserDto Sender,
     byte[] Content,
     ContentType ContentType,

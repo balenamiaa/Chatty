@@ -1,14 +1,14 @@
 using Chatty.Shared.Models.Calls;
+using Chatty.Shared.Models.Channels;
 using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Models.Messages;
-using Chatty.Shared.Models.Notifications;
 using Chatty.Shared.Models.Servers;
 using Chatty.Shared.Models.Users;
 
 namespace Chatty.Shared.Realtime.Hubs;
 
 /// <summary>
-/// Server-to-client real-time notifications
+///     Server-to-client real-time notifications
 /// </summary>
 public interface IChatHubClient
 {
@@ -16,6 +16,11 @@ public interface IChatHubClient
     Task OnMessageReceived(Guid channelId, MessageDto message);
     Task OnMessageUpdated(Guid channelId, MessageDto message);
     Task OnMessageDeleted(Guid channelId, Guid messageId);
+    Task OnMessageReplied(Guid messageId, MessageDto reply);
+    Task OnReplyCountUpdated(Guid messageId, int replyCount);
+    Task OnReactionCountUpdated(Guid messageId, int reactionCount);
+    Task OnMessagePinned(Guid channelId, MessageDto message);
+    Task OnMessageUnpinned(Guid channelId, Guid messageId);
 
     // Direct message events
     Task OnDirectMessageReceived(DirectMessageDto message);
@@ -28,9 +33,24 @@ public interface IChatHubClient
     Task OnDirectTypingStarted(Guid userId, UserDto user);
     Task OnDirectTypingStopped(Guid userId, UserDto user);
 
+    // Channel member events
+    Task OnChannelMemberJoined(Guid channelId, UserDto user);
+    Task OnChannelMemberLeft(Guid channelId, Guid userId);
+    Task OnChannelMemberUpdated(Guid channelId, UserDto user);
+
+    // Server events
+    Task OnChannelCreated(Guid serverId, ChannelDto channel);
+    Task OnChannelUpdated(Guid serverId, ChannelDto channel);
+    Task OnChannelDeleted(Guid serverId, Guid channelId);
+    Task OnRoleCreated(Guid serverId, ServerRoleDto role);
+    Task OnRoleUpdated(Guid serverId, ServerRoleDto role);
+    Task OnRoleDeleted(Guid serverId, Guid roleId);
+
     // Presence events
     Task OnUserPresenceChanged(Guid userId, UserStatus status, string? statusMessage);
-    Task OnUserOnlineStateChanged(Guid userId, bool isOnline);
+    Task OnUserUpdated(Guid userId, UserDto user);
+    Task OnUserActivityChanged(Guid userId, string activity);
+    Task OnUserStreamingChanged(Guid userId, bool isStreaming);
 
     // Voice events
     Task OnCallStarted(CallDto call);
@@ -40,6 +60,9 @@ public interface IChatHubClient
     Task OnParticipantMuted(Guid callId, Guid userId, bool isMuted);
     Task OnParticipantVideoEnabled(Guid callId, Guid userId, bool isEnabled);
     Task OnSignalingMessage(Guid peerId, string type, string data);
+    Task OnScreenShareChanged(Guid callId, CallParticipantDto participant, bool isSharing);
+    Task OnScreenShareStarted(Guid callId, CallParticipantDto participant, string streamId);
+    Task OnScreenShareStopped(Guid callId, CallParticipantDto participant);
 
     // Server member events
     Task OnMemberJoined(Guid serverId, ServerMemberDto member);
@@ -54,54 +77,6 @@ public interface IChatHubClient
     // Reaction events
     Task OnMessageReactionAdded(Guid? channelId, Guid messageId, MessageReactionDto reaction);
     Task OnMessageReactionRemoved(Guid? channelId, Guid messageId, Guid reactionId, Guid userId);
-
     Task OnDirectMessageReactionAdded(Guid messageId, MessageReactionDto reaction);
     Task OnDirectMessageReactionRemoved(Guid messageId, Guid reactionId, Guid userId);
-}
-
-/// <summary>
-/// Client-to-server real-time commands
-/// </summary>
-public interface IChatHub
-{
-    // Connection management
-    Task JoinChannelAsync(Guid channelId);
-    Task LeaveChannelAsync(Guid channelId);
-
-    // Typing indicators
-    Task StartTypingAsync(Guid channelId);
-    Task StopTypingAsync(Guid channelId);
-    Task StartDirectTypingAsync(Guid userId);
-    Task StopDirectTypingAsync(Guid userId);
-
-    // Presence
-    Task UpdatePresenceAsync(UserStatus status, string? statusMessage = null);
-
-    // Voice/Video signaling
-    Task JoinCallAsync(Guid callId, bool withVideo);
-    Task LeaveCallAsync(Guid callId);
-    Task MuteAsync(Guid callId, bool muted);
-    Task EnableVideoAsync(Guid callId, bool enabled);
-    Task SendSignalingMessageAsync(Guid callId, Guid peerId, string type, string data);
-
-    // Message operations
-    Task SendMessageAsync(CreateMessageRequest request);
-    Task UpdateMessageAsync(Guid messageId, UpdateMessageRequest request);
-    Task DeleteMessageAsync(Guid messageId);
-
-    // Direct message operations
-    Task SendDirectMessageAsync(CreateDirectMessageRequest request);
-    Task UpdateDirectMessageAsync(Guid messageId, UpdateDirectMessageRequest request);
-    Task DeleteDirectMessageAsync(Guid messageId);
-
-    // Server member operations
-    Task JoinServerAsync(Guid serverId);
-    Task LeaveServerAsync(Guid serverId);
-    Task UpdateMemberRoleAsync(Guid serverId, Guid userId, Guid roleId);
-    Task KickMemberAsync(Guid serverId, Guid userId);
-
-    // Notification operations
-    Task SubscribeToNotificationsAsync(string deviceToken, DeviceType deviceType);
-    Task UnsubscribeFromNotificationsAsync(string deviceToken);
-    Task UpdateNotificationPreferencesAsync(NotificationPreferences preferences);
 }

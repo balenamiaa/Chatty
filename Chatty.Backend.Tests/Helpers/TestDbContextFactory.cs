@@ -11,7 +11,7 @@ public static class TestDbContextFactory
     {
         var databaseName = testClassName ?? Guid.NewGuid().ToString();
         var options = new DbContextOptionsBuilder<ChattyDbContext>()
-            .UseInMemoryDatabase(databaseName: databaseName)
+            .UseInMemoryDatabase(databaseName)
             .EnableSensitiveDataLogging()
             .Options;
 
@@ -22,7 +22,7 @@ public static class TestDbContextFactory
     {
         var databaseName = testClassName ?? Guid.NewGuid().ToString();
         var options = new DbContextOptionsBuilder<ChattyDbContext>()
-            .UseInMemoryDatabase(databaseName: databaseName)
+            .UseInMemoryDatabase(databaseName)
             .EnableSensitiveDataLogging()
             .Options;
 

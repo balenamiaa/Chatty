@@ -1,7 +1,4 @@
-using System.Net.Mime;
-
 using Chatty.Shared.Models.Attachments;
-using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Models.Users;
 
 using ContentType = Chatty.Shared.Models.Enums.ContentType;

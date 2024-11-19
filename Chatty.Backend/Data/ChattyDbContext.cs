@@ -5,12 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Chatty.Backend.Data;
 
-public sealed class ChattyDbContext : DbContext
+public sealed class ChattyDbContext(DbContextOptions<ChattyDbContext> options) : DbContext(options)
 {
-    public ChattyDbContext(DbContextOptions<ChattyDbContext> options) : base(options)
-    {
-    }
-
     public DbSet<User> Users => Set<User>();
     public DbSet<UserDevice> UserDevices => Set<UserDevice>();
     public DbSet<PreKey> PreKeys => Set<PreKey>();
@@ -213,6 +209,20 @@ public sealed class ChattyDbContext : DbContext
                 .WithMany(m => m.Replies)
                 .HasForeignKey(m => m.ParentMessageId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // Configure mentions relationship
+            entity.HasMany(m => m.Mentions)
+                .WithMany()
+                .UsingEntity(
+                    "MessageMentions",
+                    l => l.HasOne(typeof(User)).WithMany().HasForeignKey("UserId").OnDelete(DeleteBehavior.Cascade),
+                    r => r.HasOne(typeof(Message)).WithMany().HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade),
+                    j =>
+                    {
+                        j.HasKey("MessageId", "UserId");
+                        j.HasIndex("UserId");
+                    });
         });
 
         // MessageReaction configuration
@@ -221,9 +231,10 @@ public sealed class ChattyDbContext : DbContext
             entity.HasKey(e => e.Id);
 
             // Only one message type can be set
-            entity.HasCheckConstraint("CK_MessageReaction_OneMessageType",
+            entity.ToTable(t => t.HasCheckConstraint(
+                "CK_MessageReaction_OneMessageType",
                 "(\"ChannelMessageId\" IS NOT NULL AND \"DirectMessageId\" IS NULL) OR " +
-                "(\"ChannelMessageId\" IS NULL AND \"DirectMessageId\" IS NOT NULL)");
+                "(\"ChannelMessageId\" IS NULL AND \"DirectMessageId\" IS NOT NULL)"));
 
             // Unique constraint: one reaction type per user per message
             entity.HasIndex(e => new { e.ChannelMessageId, e.UserId, e.Type, e.CustomEmoji })
@@ -306,7 +317,6 @@ public sealed class ChattyDbContext : DbContext
                 .HasForeignKey(a => a.DirectMessageId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-
             entity.ToTable(t => t.HasCheckConstraint(
                 "CK_Attachment_MessageType",
                 "(message_id IS NULL AND direct_message_id IS NOT NULL) OR (message_id IS NOT NULL AND direct_message_id IS NULL)"));
@@ -372,8 +382,8 @@ public sealed class ChattyDbContext : DbContext
 
             entity.ToTable(t =>
             {
-                t.HasCheckConstraint("CK_Call_CallType", $"call_type IN ('Voice', 'Video')");
-                t.HasCheckConstraint("CK_Call_Status", $"status IN ('Initiated', 'Ringing', 'Connected', 'Ended')");
+                t.HasCheckConstraint("CK_Call_CallType", "call_type IN ('Voice', 'Video')");
+                t.HasCheckConstraint("CK_Call_Status", "status IN ('Initiated', 'Ringing', 'Connected', 'Ended')");
             });
         });
 

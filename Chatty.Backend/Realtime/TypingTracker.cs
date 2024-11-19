@@ -57,6 +57,7 @@ public sealed class TypingTracker(ILogger<TypingTracker> logger) : ITypingTracke
         {
             return Task.FromResult(DateTime.UtcNow - lastUpdate < RateLimitDuration);
         }
+
         return Task.FromResult(false);
     }
 }

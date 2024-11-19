@@ -1,5 +1,4 @@
 using Chatty.Backend.Realtime.Events;
-using Chatty.Shared.Models.Attachments;
 using Chatty.Shared.Models.Enums;
 using Chatty.Shared.Models.Messages;
 using Chatty.Shared.Models.Users;
@@ -15,8 +14,8 @@ namespace Chatty.Backend.Tests.Realtime.Events;
 
 public sealed class EventBusTests
 {
-    private readonly Mock<ILogger<EventBus>> _logger;
     private readonly Mock<IEventDispatcher> _eventDispatcher;
+    private readonly Mock<ILogger<EventBus>> _logger;
     private readonly EventBus _sut;
 
     public EventBusTests()
@@ -32,30 +31,31 @@ public sealed class EventBusTests
         // Arrange
         var channelId = Guid.NewGuid();
         var message = new MessageDto(
-            Id: Guid.NewGuid(),
-            ChannelId: channelId,
-            Sender: new UserDto(
-                Id: Guid.NewGuid(),
-                Username: "test",
-                Email: "test@example.com",
-                FirstName: null,
-                LastName: null,
-                ProfilePictureUrl: null,
-                StatusMessage: null,
-                LastOnlineAt: null,
-                Locale: "en-US",
-                CreatedAt: DateTime.UtcNow),
-            Content: [1, 2, 3],
-            ContentType: ContentType.Text,
-            SentAt: DateTime.UtcNow,
-            UpdatedAt: DateTime.UtcNow,
-            IsDeleted: false,
-            MessageNonce: [4, 5, 6],
-            KeyVersion: 1,
-            ParentMessageId: null,
-            ReplyCount: 0,
-            Attachments: [],
-            Reactions: []);
+            Guid.NewGuid(),
+            channelId,
+            new UserDto(
+                Guid.NewGuid(),
+                "test",
+                "test@example.com",
+                null,
+                null,
+                null,
+                null,
+                UserStatus.Online,
+                null,
+                "en-US",
+                DateTime.UtcNow),
+            [1, 2, 3],
+            ContentType.Text,
+            DateTime.UtcNow,
+            DateTime.UtcNow,
+            false,
+            [4, 5, 6],
+            1,
+            null,
+            0,
+            [],
+            []);
 
         var @event = new MessageEvent(channelId, message);
 
@@ -64,8 +64,8 @@ public sealed class EventBusTests
 
         // Assert
         _eventDispatcher.Verify(x => x.DispatchMessageReceivedAsync(
-            channelId,
-            message),
+                channelId,
+                message),
             Times.Once);
     }
 
@@ -83,9 +83,9 @@ public sealed class EventBusTests
 
         // Assert
         _eventDispatcher.Verify(x => x.DispatchUserPresenceChangedAsync(
-            userId,
-            status,
-            statusMessage),
+                userId,
+                status,
+                statusMessage),
             Times.Once);
     }
 
@@ -152,5 +152,7 @@ public sealed class EventBusTests
         Assert.True(goodSubscriberCalled);
     }
 
-    private class TestEvent { }
+    private class TestEvent
+    {
+    }
 }

@@ -65,41 +65,5 @@ public sealed class PresenceModule : ICarterModule
                     detail: result.Error.Message,
                     statusCode: StatusCodes.Status400BadRequest);
         });
-
-        // Subscribe to presence updates
-        group.MapPost("/subscribe", async (
-            [FromBody] IEnumerable<Guid> userIds,
-            IPresenceService presenceService,
-            ClaimsPrincipal user,
-            CancellationToken ct) =>
-        {
-            var subscriberId = Guid.Parse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-            var result = await presenceService.SubscribeToPresenceUpdatesAsync(subscriberId, userIds, ct);
-
-            return result.IsSuccess
-                ? Results.NoContent()
-                : Results.Problem(
-                    title: result.Error.Code,
-                    detail: result.Error.Message,
-                    statusCode: StatusCodes.Status400BadRequest);
-        });
-
-        // Unsubscribe from presence updates
-        group.MapPost("/unsubscribe", async (
-            [FromBody] IEnumerable<Guid> userIds,
-            IPresenceService presenceService,
-            ClaimsPrincipal user,
-            CancellationToken ct) =>
-        {
-            var subscriberId = Guid.Parse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-            var result = await presenceService.UnsubscribeFromPresenceUpdatesAsync(subscriberId, userIds, ct);
-
-            return result.IsSuccess
-                ? Results.NoContent()
-                : Results.Problem(
-                    title: result.Error.Code,
-                    detail: result.Error.Message,
-                    statusCode: StatusCodes.Status400BadRequest);
-        });
     }
 }

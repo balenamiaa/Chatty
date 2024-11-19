@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace Chatty.Shared.Models.Notifications;
 
 public sealed record NotificationPreferences(

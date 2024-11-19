@@ -1,7 +1,6 @@
 using System.Security.Claims;
 
 using Chatty.Backend.Data;
-using Chatty.Backend.Data.Models;
 using Chatty.Backend.Data.Models.Extensions;
 using Chatty.Backend.Realtime;
 using Chatty.Backend.Realtime.Events;
@@ -32,21 +31,21 @@ namespace Chatty.Backend.Tests.Realtime.Hubs;
 
 public sealed class ChatHubTests : IDisposable
 {
-    private readonly ChattyDbContext _context;
-    private readonly Mock<IPresenceService> _presenceService;
-    private readonly Mock<IVoiceService> _voiceService;
-    private readonly Mock<IConnectionTracker> _connectionTracker;
-    private readonly Mock<IMessageService> _messageService;
-    private readonly Mock<ITypingTracker> _typingTracker;
-    private readonly Mock<IEventBus> _eventBus;
     private readonly Mock<IChannelService> _channelService;
-    private readonly Mock<ILogger<ChatHub>> _logger;
-    private readonly Mock<HubCallerContext> _hubCallerContext;
+    private readonly Mock<IConnectionTracker> _connectionTracker;
+    private readonly ChattyDbContext _context;
+    private readonly Mock<IEventBus> _eventBus;
     private readonly Mock<IGroupManager> _groupManager;
+    private readonly Mock<HubCallerContext> _hubCallerContext;
     private readonly Mock<IHubCallerClients<IChatHubClient>> _hubClients;
-    private readonly Mock<IServerService> _serverService;
+    private readonly Mock<ILogger<ChatHub>> _logger;
+    private readonly Mock<IMessageService> _messageService;
     private readonly Mock<IValidator<NotificationPreferences>> _notificationSettingsValidator;
+    private readonly Mock<IPresenceService> _presenceService;
+    private readonly Mock<IServerService> _serverService;
     private readonly ChatHub _sut;
+    private readonly Mock<ITypingTracker> _typingTracker;
+    private readonly Mock<IVoiceService> _voiceService;
 
     public ChatHubTests()
     {
@@ -67,17 +66,17 @@ public sealed class ChatHubTests : IDisposable
         _hubClients = new Mock<IHubCallerClients<IChatHubClient>>();
 
         _sut = new ChatHub(
-            logger: _logger.Object,
-            presenceService: _presenceService.Object,
-            voiceService: _voiceService.Object,
-            connectionTracker: _connectionTracker.Object,
-            messageService: _messageService.Object,
-            typingTracker: _typingTracker.Object,
-            eventBus: _eventBus.Object,
-            channelService: _channelService.Object,
-            serverService: _serverService.Object,
-            context: _context,
-            notificationSettingsValidator: _notificationSettingsValidator.Object)
+            _logger.Object,
+            _presenceService.Object,
+            _voiceService.Object,
+            _connectionTracker.Object,
+            _messageService.Object,
+            _typingTracker.Object,
+            _eventBus.Object,
+            _channelService.Object,
+            _serverService.Object,
+            _context,
+            _notificationSettingsValidator.Object)
         {
             Context = _hubCallerContext.Object,
             Groups = _groupManager.Object,
@@ -87,10 +86,9 @@ public sealed class ChatHubTests : IDisposable
         SetupTestData();
     }
 
-    private void SetupTestData()
-    {
-        TestData.TestDbSeeder.SeedBasicTestData(_context);
-    }
+    public void Dispose() => TestDbContextFactory.Destroy(_context);
+
+    private void SetupTestData() => TestData.TestDbSeeder.SeedBasicTestData(_context);
 
     [Fact]
     public async Task OnConnectedAsync_AddsConnectionAndUpdatesPresence()
@@ -104,20 +102,20 @@ public sealed class ChatHubTests : IDisposable
 
         // Assert
         _connectionTracker.Verify(x => x.AddConnectionAsync(
-            userId,
-            _hubCallerContext.Object.ConnectionId),
+                userId,
+                _hubCallerContext.Object.ConnectionId),
             Times.Once);
 
         _presenceService.Verify(x => x.UpdateLastSeenAsync(
-            userId,
-            It.IsAny<CancellationToken>()),
+                userId,
+                It.IsAny<CancellationToken>()),
             Times.Once);
 
         _eventBus.Verify(x => x.PublishAsync(
-            It.Is<OnlineStateEvent>(e =>
-                e.UserId == userId &&
-                e.IsOnline),
-            It.IsAny<CancellationToken>()),
+                It.Is<PresenceEvent>(e =>
+                    e.UserId == userId &&
+                    e.Status == UserStatus.Online),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -128,18 +126,28 @@ public sealed class ChatHubTests : IDisposable
         var userId = TestData.Users.User1.Id;
         SetupUserContext(userId);
 
+        _connectionTracker.Setup(x => x.IsOnlineAsync(userId))
+            .ReturnsAsync(false);
+
         // Act
         await _sut.OnDisconnectedAsync(null);
 
         // Assert
         _connectionTracker.Verify(x => x.RemoveConnectionAsync(
-            userId,
-            _hubCallerContext.Object.ConnectionId),
+                userId,
+                _hubCallerContext.Object.ConnectionId),
             Times.Once);
 
         _presenceService.Verify(x => x.UpdateLastSeenAsync(
-            userId,
-            It.IsAny<CancellationToken>()),
+                userId,
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        _eventBus.Verify(x => x.PublishAsync(
+                It.Is<PresenceEvent>(e =>
+                    e.UserId == userId &&
+                    e.Status == UserStatus.Offline),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -162,9 +170,9 @@ public sealed class ChatHubTests : IDisposable
 
         // Assert
         _groupManager.Verify(x => x.AddToGroupAsync(
-            _hubCallerContext.Object.ConnectionId,
-            $"channel_{channelId}",
-            It.IsAny<CancellationToken>()),
+                _hubCallerContext.Object.ConnectionId,
+                $"channel_{channelId}",
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -184,9 +192,9 @@ public sealed class ChatHubTests : IDisposable
         // Act & Assert
         await Assert.ThrowsAsync<HubException>(() => _sut.JoinChannelAsync(channelId));
         _groupManager.Verify(x => x.AddToGroupAsync(
-            It.IsAny<string>(),
-            It.IsAny<string>(),
-            It.IsAny<CancellationToken>()),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -209,17 +217,17 @@ public sealed class ChatHubTests : IDisposable
 
         // Assert
         _typingTracker.Verify(x => x.TrackTypingAsync(
-            channelId,
-            userId,
-            It.IsAny<CancellationToken>()),
+                channelId,
+                userId,
+                It.IsAny<CancellationToken>()),
             Times.Once);
 
         _eventBus.Verify(x => x.PublishAsync(
-            It.Is<TypingEvent>(e =>
-                e.ChannelId == channelId &&
-                e.User.Id == userId &&
-                e.IsTyping),
-            It.IsAny<CancellationToken>()),
+                It.Is<TypingEvent>(e =>
+                    e.ChannelId == channelId &&
+                    e.User.Id == userId &&
+                    e.IsTyping),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -252,10 +260,5 @@ public sealed class ChatHubTests : IDisposable
 
         _hubCallerContext.Setup(x => x.User).Returns(principal);
         _hubCallerContext.Setup(x => x.ConnectionId).Returns(Guid.NewGuid().ToString());
-    }
-
-    public void Dispose()
-    {
-        TestDbContextFactory.Destroy(_context);
     }
 }

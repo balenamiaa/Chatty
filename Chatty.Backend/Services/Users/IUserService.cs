@@ -12,7 +12,12 @@ public interface IUserService : IService
     Task<Result<UserDto>> GetByIdAsync(Guid userId, CancellationToken ct = default);
     Task<Result<UserDto>> GetByEmailAsync(string email, CancellationToken ct = default);
     Task<Result<UserDto>> GetByUsernameAsync(string username, CancellationToken ct = default);
-    Task<Result<bool>> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword, CancellationToken ct = default);
+
+    Task<Result<bool>> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword,
+        CancellationToken ct = default);
+
     Task<Result<bool>> RequestPasswordResetAsync(string email, CancellationToken ct = default);
-    Task<Result<bool>> ResetPasswordAsync(string email, string token, string newPassword, CancellationToken ct = default);
+
+    Task<Result<bool>> ResetPasswordAsync(string email, string token, string newPassword,
+        CancellationToken ct = default);
 }

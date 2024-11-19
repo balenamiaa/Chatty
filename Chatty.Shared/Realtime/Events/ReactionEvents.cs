@@ -3,7 +3,7 @@ using Chatty.Shared.Models.Messages;
 namespace Chatty.Shared.Realtime.Events;
 
 /// <summary>
-/// Event published when a reaction is added to a channel message
+///     Event published when a reaction is added to a channel message
 /// </summary>
 /// <param name="ChannelId">The channel ID</param>
 /// <param name="MessageId">The message ID</param>
@@ -14,7 +14,7 @@ public record MessageReactionAddedEvent(
     MessageReactionDto Reaction);
 
 /// <summary>
-/// Event published when a reaction is removed from a channel message
+///     Event published when a reaction is removed from a channel message
 /// </summary>
 /// <param name="ChannelId">The channel ID</param>
 /// <param name="MessageId">The message ID</param>
@@ -27,7 +27,7 @@ public record MessageReactionRemovedEvent(
     Guid UserId);
 
 /// <summary>
-/// Event published when a reaction is added to a direct message
+///     Event published when a reaction is added to a direct message
 /// </summary>
 /// <param name="MessageId">The message ID</param>
 /// <param name="Reaction">The reaction that was added</param>
@@ -36,7 +36,7 @@ public record DirectMessageReactionAddedEvent(
     MessageReactionDto Reaction);
 
 /// <summary>
-/// Event published when a reaction is removed from a direct message
+///     Event published when a reaction is removed from a direct message
 /// </summary>
 /// <param name="MessageId">The message ID</param>
 /// <param name="ReactionId">The ID of the reaction that was removed</param>

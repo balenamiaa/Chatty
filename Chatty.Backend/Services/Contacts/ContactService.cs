@@ -26,16 +26,20 @@ public sealed class ContactService(
             .FirstOrDefaultAsync(u => u.Id == request.ContactUserId, ct);
 
         if (contactUser is null)
+        {
             return Result<ContactDto>.Failure(Error.NotFound("Contact user not found"));
+        }
 
         // Check if contact already exists
         var existingContact = await context.Contacts
             .FirstOrDefaultAsync(c =>
-                (c.UserId == userId && c.ContactUserId == request.ContactUserId) ||
-                (c.UserId == request.ContactUserId && c.ContactUserId == userId), ct);
+                c.UserId == userId && c.ContactUserId == request.ContactUserId ||
+                c.UserId == request.ContactUserId && c.ContactUserId == userId, ct);
 
         if (existingContact is not null)
+        {
             return Result<ContactDto>.Failure(Error.Conflict("Contact already exists"));
+        }
 
         try
         {
@@ -95,7 +99,9 @@ public sealed class ContactService(
             .FirstOrDefaultAsync(c => c.Id == contactId && c.UserId == userId, ct);
 
         if (contact is null)
+        {
             return Result<bool>.Success(true); // Already deleted
+        }
 
         try
         {
@@ -133,14 +139,20 @@ public sealed class ContactService(
             .FirstOrDefaultAsync(c => c.Id == contactId, ct);
 
         if (contact is null)
+        {
             return Result<bool>.Failure(Error.NotFound("Contact not found"));
+        }
 
         // Verify the accepting user is the contact user
         if (contact.ContactUserId != userId)
+        {
             return Result<bool>.Failure(Error.Unauthorized("Only the contact recipient can accept the request"));
+        }
 
         if (contact.Status != ContactStatus.Pending)
+        {
             return Result<bool>.Failure(Error.Validation("Contact is not pending"));
+        }
 
         try
         {
@@ -186,7 +198,9 @@ public sealed class ContactService(
             .FirstOrDefaultAsync(c => c.Id == contactId && c.UserId == userId, ct);
 
         if (contact is null)
+        {
             return Result<bool>.Failure(Error.NotFound("Contact not found"));
+        }
 
         try
         {
@@ -231,10 +245,14 @@ public sealed class ContactService(
             .FirstOrDefaultAsync(c => c.Id == contactId && c.UserId == userId, ct);
 
         if (contact is null)
+        {
             return Result<bool>.Failure(Error.NotFound("Contact not found"));
+        }
 
         if (contact.Status != ContactStatus.Blocked)
+        {
             return Result<bool>.Failure(Error.Validation("Contact is not blocked"));
+        }
 
         try
         {

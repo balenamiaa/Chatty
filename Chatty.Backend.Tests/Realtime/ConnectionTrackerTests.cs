@@ -109,7 +109,7 @@ public sealed class ConnectionTrackerTests
         await _sut.AddConnectionAsync(user2, "connection2");
 
         // Act
-        var result = await _sut.GetConnectionsAsync(new[] { user1, user2 });
+        var result = await _sut.GetConnectionsAsync([user1, user2]);
 
         // Assert
         Assert.Equal(2, result.Count);

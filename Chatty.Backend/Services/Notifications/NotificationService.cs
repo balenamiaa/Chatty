@@ -31,12 +31,16 @@ public sealed class NotificationService(
                 .ToListAsync(ct);
 
             if (!devices.Any())
+            {
                 return Result<bool>.Success(true); // No devices to send to
+            }
 
             foreach (var device in devices)
             {
                 if (string.IsNullOrEmpty(device.DeviceToken))
+                {
                     continue;
+                }
 
                 // TODO: Implement actual push notification sending based on device type
                 switch (device.DeviceType)
@@ -75,7 +79,9 @@ public sealed class NotificationService(
                 .FirstOrDefaultAsync(d => d.DeviceToken == deviceToken, ct);
 
             if (device is null)
+            {
                 return Result<bool>.Failure(Error.NotFound("Device not found"));
+            }
 
             // Use notification settings for different providers
             switch (device.DeviceType)
@@ -211,7 +217,9 @@ public sealed class NotificationService(
                     d.DeviceToken == deviceToken, ct);
 
             if (device is null)
+            {
                 return Result<bool>.Success(true); // Already unregistered
+            }
 
             context.UserDevices.Remove(device);
             await context.SaveChangesAsync(ct);

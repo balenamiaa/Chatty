@@ -9,12 +9,7 @@ namespace Chatty.Backend.Tests.Security;
 
 public sealed class CryptoProviderTests
 {
-    private readonly ICryptoProvider _sut;
-
-    public CryptoProviderTests()
-    {
-        _sut = new CryptoProvider();
-    }
+    private readonly ICryptoProvider _sut = new CryptoProvider();
 
     [Fact]
     public void GenerateKey_ReturnsValidKey()

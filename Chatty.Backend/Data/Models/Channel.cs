@@ -5,7 +5,7 @@ namespace Chatty.Backend.Data.Models;
 public sealed class Channel
 {
     public Guid Id { get; set; }
-    public Guid? ServerId { get; set; }
+    public Guid ServerId { get; set; }
     public required string Name { get; set; }
     public string? Topic { get; set; }
     public bool IsPrivate { get; set; }

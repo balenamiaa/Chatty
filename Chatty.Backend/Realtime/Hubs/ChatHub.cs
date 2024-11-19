@@ -10,7 +10,6 @@ using Chatty.Backend.Services.Channels;
 using Chatty.Backend.Services.Messages;
 using Chatty.Backend.Services.Presence;
 using Chatty.Backend.Services.Servers;
-using Chatty.Backend.Services.Users;
 using Chatty.Backend.Services.Voice;
 using Chatty.Shared.Models.Common;
 using Chatty.Shared.Models.Enums;
@@ -41,22 +40,16 @@ public sealed class ChatHub(
     IServerService serverService,
     ChattyDbContext context,
     IValidator<NotificationPreferences> notificationSettingsValidator)
-    : Hub<IChatHubClient>, IChatHub
+    : Hub<IChatHubClient>
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
-
-    public override async Task OnConnectedAsync()
+    public async override Task OnConnectedAsync()
     {
         try
         {
             var userId = GetUserId();
             await connectionTracker.AddConnectionAsync(userId, Context.ConnectionId);
             await presenceService.UpdateLastSeenAsync(userId);
-            await eventBus.PublishAsync(new OnlineStateEvent(userId, true));
+            await eventBus.PublishAsync(new PresenceEvent(userId, UserStatus.Online, null));
 
             logger.LogInformation("User {UserId} connected with connection {ConnectionId}",
                 userId, Context.ConnectionId);
@@ -70,7 +63,7 @@ public sealed class ChatHub(
         }
     }
 
-    public override async Task OnDisconnectedAsync(Exception? exception)
+    public async override Task OnDisconnectedAsync(Exception? exception)
     {
         try
         {
@@ -80,7 +73,7 @@ public sealed class ChatHub(
 
             if (!await connectionTracker.IsOnlineAsync(userId))
             {
-                await eventBus.PublishAsync(new OnlineStateEvent(userId, false));
+                await eventBus.PublishAsync(new PresenceEvent(userId, UserStatus.Offline, null));
             }
 
             logger.LogInformation("User {UserId} disconnected from {ConnectionId}",
@@ -125,8 +118,7 @@ public sealed class ChatHub(
         }
     }
 
-    public async Task JoinChannelAsync(Guid channelId)
-    {
+    public async Task JoinChannelAsync(Guid channelId) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -147,10 +139,8 @@ public sealed class ChatHub(
             await Groups.AddToGroupAsync(Context.ConnectionId, $"channel_{channelId}");
             return Result<bool>.Success(true);
         });
-    }
 
-    public async Task StartTypingAsync(Guid channelId)
-    {
+    public async Task StartTypingAsync(Guid channelId) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -173,10 +163,8 @@ public sealed class ChatHub(
 
             return Result<bool>.Success(true);
         });
-    }
 
-    public async Task LeaveChannelAsync(Guid channelId)
-    {
+    public async Task LeaveChannelAsync(Guid channelId) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -191,10 +179,8 @@ public sealed class ChatHub(
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"channel_{channelId}");
             return Result<bool>.Success(true);
         });
-    }
 
-    public async Task StopTypingAsync(Guid channelId)
-    {
+    public async Task StopTypingAsync(Guid channelId) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -202,10 +188,8 @@ public sealed class ChatHub(
             await eventBus.PublishAsync(new TypingEvent(channelId, userDto, false));
             return Result<bool>.Success(true);
         });
-    }
 
-    public async Task StartDirectTypingAsync(Guid recipientId)
-    {
+    public async Task StartDirectTypingAsync(Guid recipientId) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -221,10 +205,8 @@ public sealed class ChatHub(
 
             return Result<bool>.Success(true);
         });
-    }
 
-    public async Task StopDirectTypingAsync(Guid recipientId)
-    {
+    public async Task StopDirectTypingAsync(Guid recipientId) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -232,20 +214,30 @@ public sealed class ChatHub(
             await eventBus.PublishAsync(new DirectTypingEvent(recipientId, userDto, false));
             return Result<bool>.Success(true);
         });
-    }
 
-    public async Task UpdatePresenceAsync(UserStatus status, string? statusMessage = null)
-    {
+    public async Task UpdatePresenceAsync(UserStatus status, string? statusMessage = null) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
             var result = await presenceService.UpdateStatusAsync(userId, status, statusMessage);
             return result;
         });
-    }
 
-    public async Task JoinCallAsync(Guid callId, bool withVideo)
-    {
+    public async Task GetUserStatusAsync(Guid userId) =>
+        await ExecuteHubMethodAsync(async () =>
+        {
+            var result = await presenceService.GetUserStatusAsync(userId);
+            return result;
+        });
+
+    public async Task GetUsersStatusAsync(IEnumerable<Guid> userIds) =>
+        await ExecuteHubMethodAsync(async () =>
+        {
+            var result = await presenceService.GetUsersStatusAsync(userIds);
+            return result;
+        });
+
+    public async Task JoinCallAsync(Guid callId, bool withVideo) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -258,10 +250,8 @@ public sealed class ChatHub(
 
             return result;
         });
-    }
 
-    public async Task LeaveCallAsync(Guid callId)
-    {
+    public async Task LeaveCallAsync(Guid callId) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -274,28 +264,22 @@ public sealed class ChatHub(
 
             return result;
         });
-    }
 
-    public async Task MuteAsync(Guid callId, bool muted)
-    {
+    public async Task MuteAsync(Guid callId, bool muted) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
             return await voiceService.MuteParticipantAsync(callId, userId, muted);
         });
-    }
 
-    public async Task EnableVideoAsync(Guid callId, bool enabled)
-    {
+    public async Task EnableVideoAsync(Guid callId, bool enabled) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
             return await voiceService.EnableVideoAsync(callId, userId, enabled);
         });
-    }
 
-    public async Task SendSignalingMessageAsync(Guid callId, Guid peerId, string type, string data)
-    {
+    public async Task SendSignalingMessageAsync(Guid callId, Guid peerId, string type, string data) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -325,11 +309,9 @@ public sealed class ChatHub(
 
             return Result<bool>.Success(true);
         });
-    }
 
     // Server member operations
-    public async Task JoinServerAsync(Guid serverId)
-    {
+    public async Task JoinServerAsync(Guid serverId) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -349,7 +331,7 @@ public sealed class ChatHub(
                 return Result<bool>.Failure(Error.Conflict("Already a member of this server"));
             }
 
-            var result = await serverService.AddMemberAsync(serverId, userId, null);
+            var result = await serverService.AddMemberAsync(serverId, userId);
             if (result.IsSuccess)
             {
                 // Add to server group
@@ -372,10 +354,8 @@ public sealed class ChatHub(
 
             return Result<bool>.Failure(result.Error);
         });
-    }
 
-    public async Task LeaveServerAsync(Guid serverId)
-    {
+    public async Task LeaveServerAsync(Guid serverId) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -419,10 +399,8 @@ public sealed class ChatHub(
 
             return Result<bool>.Failure(result.Error);
         });
-    }
 
-    public async Task UpdateMemberRoleAsync(Guid serverId, Guid userId, Guid roleId)
-    {
+    public async Task UpdateMemberRoleAsync(Guid serverId, Guid userId, Guid roleId) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var currentUserId = GetUserId();
@@ -473,10 +451,8 @@ public sealed class ChatHub(
 
             return Result<bool>.Failure(result.Error);
         });
-    }
 
-    public async Task KickMemberAsync(Guid serverId, Guid userId)
-    {
+    public async Task KickMemberAsync(Guid serverId, Guid userId) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var currentUserId = GetUserId();
@@ -525,11 +501,9 @@ public sealed class ChatHub(
 
             return Result<bool>.Failure(result.Error);
         });
-    }
 
     // Notification operations
-    public async Task SubscribeToNotificationsAsync(string deviceToken, DeviceType deviceType)
-    {
+    public async Task SubscribeToNotificationsAsync(string deviceToken, DeviceType deviceType) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -551,7 +525,7 @@ public sealed class ChatHub(
                     DeviceId = Guid.NewGuid(),
                     DeviceToken = deviceToken,
                     DeviceType = deviceType,
-                    PublicKey = Array.Empty<byte>(), // Should be set by client
+                    PublicKey = [], // Should be set by client
                     CreatedAt = DateTime.UtcNow
                 };
                 context.UserDevices.Add(device);
@@ -569,10 +543,8 @@ public sealed class ChatHub(
             await context.SaveChangesAsync();
             return Result<bool>.Success(true);
         });
-    }
 
-    public async Task UnsubscribeFromNotificationsAsync(string deviceToken)
-    {
+    public async Task UnsubscribeFromNotificationsAsync(string deviceToken) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -599,10 +571,8 @@ public sealed class ChatHub(
 
             return Result<bool>.Success(true);
         });
-    }
 
-    public async Task UpdateNotificationPreferencesAsync(NotificationPreferences preferences)
-    {
+    public async Task UpdateNotificationPreferencesAsync(NotificationPreferences preferences) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -628,10 +598,8 @@ public sealed class ChatHub(
             await context.SaveChangesAsync();
             return Result<bool>.Success(true);
         });
-    }
 
-    public async Task SendMessageAsync(CreateMessageRequest request)
-    {
+    public async Task SendMessageAsync(CreateMessageRequest request) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -644,10 +612,8 @@ public sealed class ChatHub(
 
             return Result<bool>.Failure(result.Error);
         });
-    }
 
-    public async Task UpdateMessageAsync(Guid messageId, UpdateMessageRequest request)
-    {
+    public async Task UpdateMessageAsync(Guid messageId, UpdateMessageRequest request) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -660,10 +626,8 @@ public sealed class ChatHub(
 
             return Result<bool>.Failure(result.Error);
         });
-    }
 
-    public async Task DeleteMessageAsync(Guid messageId)
-    {
+    public async Task DeleteMessageAsync(Guid messageId) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -676,10 +640,8 @@ public sealed class ChatHub(
 
             return Result<bool>.Failure(result.Error);
         });
-    }
 
-    public async Task SendDirectMessageAsync(CreateDirectMessageRequest request)
-    {
+    public async Task SendDirectMessageAsync(CreateDirectMessageRequest request) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -692,10 +654,8 @@ public sealed class ChatHub(
 
             return Result<bool>.Failure(result.Error);
         });
-    }
 
-    public async Task UpdateDirectMessageAsync(Guid messageId, UpdateDirectMessageRequest request)
-    {
+    public async Task UpdateDirectMessageAsync(Guid messageId, UpdateDirectMessageRequest request) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -708,10 +668,8 @@ public sealed class ChatHub(
 
             return Result<bool>.Failure(result.Error);
         });
-    }
 
-    public async Task DeleteDirectMessageAsync(Guid messageId)
-    {
+    public async Task DeleteDirectMessageAsync(Guid messageId) =>
         await ExecuteHubMethodAsync(async () =>
         {
             var userId = GetUserId();
@@ -724,7 +682,50 @@ public sealed class ChatHub(
 
             return Result<bool>.Failure(result.Error);
         });
-    }
+
+    // Message reply operations
+    public async Task ReplyToMessageAsync(Guid messageId, ReplyMessageRequest request) =>
+        await ExecuteHubMethodAsync(async () =>
+        {
+            var userId = GetUserId();
+            var result = await messageService.ReplyAsync(messageId, userId, request);
+            if (result.IsSuccess)
+            {
+                // Reply event will be published through event bus
+                return Result<bool>.Success(true);
+            }
+
+            return Result<bool>.Failure(result.Error);
+        });
+
+    // Pin operations
+    public async Task PinMessageAsync(Guid channelId, Guid messageId) =>
+        await ExecuteHubMethodAsync(async () =>
+        {
+            var userId = GetUserId();
+            var result = await messageService.PinMessageAsync(channelId, messageId, userId);
+            if (result.IsSuccess)
+            {
+                // Pin event will be published through event bus
+                return Result<bool>.Success(true);
+            }
+
+            return Result<bool>.Failure(result.Error);
+        });
+
+    public async Task UnpinMessageAsync(Guid channelId, Guid messageId) =>
+        await ExecuteHubMethodAsync(async () =>
+        {
+            var userId = GetUserId();
+            var result = await messageService.UnpinMessageAsync(channelId, messageId, userId);
+            if (result.IsSuccess)
+            {
+                // Unpin event will be published through event bus
+                return Result<bool>.Success(true);
+            }
+
+            return Result<bool>.Failure(result.Error);
+        });
 
     private Guid GetUserId()
     {

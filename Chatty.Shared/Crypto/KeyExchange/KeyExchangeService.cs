@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 
 namespace Chatty.Shared.Crypto.KeyExchange;
 
@@ -54,7 +55,8 @@ public sealed class KeyExchangeService : IKeyExchangeService
         int keyLength = 32)
     {
         var pseudorandomKey = HKDF.Extract(HashAlgorithmName.SHA256, sharedSecret, salt);
-        var sessionKey = HKDF.Expand(HashAlgorithmName.SHA256, pseudorandomKey, keyLength, System.Text.Encoding.UTF8.GetBytes(info));
+        var sessionKey = HKDF.Expand(HashAlgorithmName.SHA256, pseudorandomKey, keyLength,
+            Encoding.UTF8.GetBytes(info));
 
         return Task.FromResult(sessionKey);
     }

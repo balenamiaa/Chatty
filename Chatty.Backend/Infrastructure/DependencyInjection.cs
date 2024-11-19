@@ -42,7 +42,7 @@ public static class DependencyInjection
 
         // Add Authentication
         services.AddAuthentication()
-                .AddJwtBearer();
+            .AddJwtBearer();
 
         services.AddAuthorization();
 

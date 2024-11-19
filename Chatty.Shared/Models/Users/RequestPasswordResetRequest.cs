@@ -1,4 +1,7 @@
+using MessagePack;
+
 namespace Chatty.Shared.Models.Users;
 
+[MessagePackObject]
 public sealed record RequestPasswordResetRequest(
-    string Email);
+    [property: Key(0)] string Email);

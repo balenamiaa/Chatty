@@ -1,7 +1,7 @@
 using Chatty.Backend.Data;
 using Chatty.Backend.Data.Models;
-using Chatty.Backend.Infrastructure.Configuration;
 using Chatty.Backend.Realtime.Events;
+using Chatty.Backend.Services.Channels;
 using Chatty.Backend.Services.Messages;
 using Chatty.Backend.Tests.Helpers;
 using Chatty.Shared.Crypto;
@@ -12,7 +12,6 @@ using Chatty.Shared.Realtime.Events;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 
 using Moq;
 
@@ -22,6 +21,7 @@ namespace Chatty.Backend.Tests.Services.Messages;
 
 public sealed class MessageServiceTests : IDisposable
 {
+    private readonly Mock<IChannelService> _channelService = new();
     private readonly IDbContextFactory<ChattyDbContext> _contextFactory;
     private readonly Mock<IEventBus> _eventBus;
     private readonly MessageService _sut;
@@ -37,11 +37,14 @@ public sealed class MessageServiceTests : IDisposable
             _contextFactory,
             _eventBus.Object,
             crypto.Object,
+            _channelService.Object,
             logger.Object,
             TestData.Settings.LimitSettings);
 
         SetupTestData().Wait();
     }
+
+    public void Dispose() => TestDbContextFactory.Destroy(_contextFactory);
 
     private async Task SetupTestData()
     {
@@ -70,11 +73,11 @@ public sealed class MessageServiceTests : IDisposable
         // Arrange
         var userId = TestData.Users.User1.Id;
         var request = new CreateMessageRequest(
-            ChannelId: TestData.Channels.TextChannel.Id,
-            Content: [1, 2, 3],
-            ContentType: ContentType.Text,
-            MessageNonce: [4, 5, 6],
-            KeyVersion: 1);
+            TestData.Channels.TextChannel.Id,
+            [1, 2, 3],
+            ContentType.Text,
+            [4, 5, 6],
+            1);
 
         // Act
         var result = await _sut.CreateAsync(userId, request);
@@ -102,11 +105,11 @@ public sealed class MessageServiceTests : IDisposable
         // Arrange
         var userId = TestData.Users.User1.Id;
         var request = new CreateMessageRequest(
-            ChannelId: Guid.NewGuid(), // Non-existent channel
-            Content: [1, 2, 3],
-            ContentType: ContentType.Text,
-            MessageNonce: [4, 5, 6],
-            KeyVersion: 1);
+            Guid.NewGuid(), // Non-existent channel
+            [1, 2, 3],
+            ContentType.Text,
+            [4, 5, 6],
+            1);
 
         // Act
         var result = await _sut.CreateAsync(userId, request);
@@ -122,11 +125,11 @@ public sealed class MessageServiceTests : IDisposable
         // Arrange
         var userId = TestData.Users.User2.Id; // User2 is not a member of Channel1
         var request = new CreateMessageRequest(
-            ChannelId: TestData.Channels.TextChannel.Id,
-            Content: [1, 2, 3],
-            ContentType: ContentType.Text,
-            MessageNonce: [4, 5, 6],
-            KeyVersion: 1);
+            TestData.Channels.TextChannel.Id,
+            [1, 2, 3],
+            ContentType.Text,
+            [4, 5, 6],
+            1);
 
         // Act
         var result = await _sut.CreateAsync(userId, request);
@@ -139,14 +142,13 @@ public sealed class MessageServiceTests : IDisposable
     [Fact]
     public async Task GetChannelMessagesAsync_WithPagination_ReturnsCorrectOrder()
     {
-
         await using var context = await _contextFactory.CreateDbContextAsync();
 
         // Arrange
         var channelId = TestData.Channels.TextChannel.Id;
         var messages = new List<Message>();
 
-        for (int i = 0; i < 10; i++)
+        for (var i = 0; i < 10; i++)
         {
             messages.Add(new Message
             {
@@ -198,11 +200,11 @@ public sealed class MessageServiceTests : IDisposable
         await context.SaveChangesAsync();
 
         var request = new CreateMessageRequest(
-            ChannelId: TestData.Channels.TextChannel.Id,
-            Content: [1, 2, 3],
-            ContentType: ContentType.Text,
-            MessageNonce: [4, 5, 6],
-            KeyVersion: 1,
+            TestData.Channels.TextChannel.Id,
+            [1, 2, 3],
+            ContentType.Text,
+            [4, 5, 6],
+            1,
             Attachments: attachments.Select(a => a.Id).ToList());
 
         // Act
@@ -220,14 +222,14 @@ public sealed class MessageServiceTests : IDisposable
         // Arrange
         var userId = TestData.Users.User1.Id;
         var request = new CreateMessageRequest(
-            ChannelId: TestData.Channels.TextChannel.Id,
-            Content: [1, 2, 3],
-            ContentType: ContentType.Text,
-            MessageNonce: [4, 5, 6],
-            KeyVersion: 1);
+            TestData.Channels.TextChannel.Id,
+            [1, 2, 3],
+            ContentType.Text,
+            [4, 5, 6],
+            1);
 
         // Send messages until rate limit is exceeded
-        for (int i = 0; i < TestData.Settings.LimitSettings.Value.RateLimits.Messages.Points; i++)
+        for (var i = 0; i < TestData.Settings.LimitSettings.Value.RateLimits.Messages.Points; i++)
         {
             await _sut.CreateAsync(userId, request);
         }
@@ -294,11 +296,11 @@ public sealed class MessageServiceTests : IDisposable
     {
         // Arrange
         var request = new CreateDirectMessageRequest(
-            RecipientId: TestData.Users.User2.Id,
-            Content: [1, 2, 3],
-            ContentType: ContentType.Text,
-            MessageNonce: [4, 5, 6],
-            KeyVersion: 1);
+            TestData.Users.User2.Id,
+            [1, 2, 3],
+            ContentType.Text,
+            [4, 5, 6],
+            1);
 
         // Act
         var result = await _sut.CreateDirectAsync(TestData.Users.User1.Id, request);
@@ -315,11 +317,11 @@ public sealed class MessageServiceTests : IDisposable
 
         // Verify event was published
         _eventBus.Verify(x => x.PublishAsync(
-            It.Is<DirectMessageEvent>(e =>
-                e.Message.Sender.Id == TestData.Users.User1.Id &&
-                e.Message.Recipient.Id == TestData.Users.User2.Id &&
-                e.Message.Content.SequenceEqual(request.Content)),
-            It.IsAny<CancellationToken>()),
+                It.Is<DirectMessageEvent>(e =>
+                    e.Message.Sender.Id == TestData.Users.User1.Id &&
+                    e.Message.Recipient.Id == TestData.Users.User2.Id &&
+                    e.Message.Content.SequenceEqual(request.Content)),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -339,11 +341,11 @@ public sealed class MessageServiceTests : IDisposable
         await context.SaveChangesAsync();
 
         var request = new CreateDirectMessageRequest(
-            RecipientId: TestData.Users.User2.Id,
-            Content: [1, 2, 3],
-            ContentType: ContentType.Text,
-            MessageNonce: [4, 5, 6],
-            KeyVersion: 1);
+            TestData.Users.User2.Id,
+            [1, 2, 3],
+            ContentType.Text,
+            [4, 5, 6],
+            1);
 
         // Act
         var result = await _sut.CreateDirectAsync(TestData.Users.User1.Id, request);
@@ -382,8 +384,8 @@ public sealed class MessageServiceTests : IDisposable
 
             // Verify event was published
             _eventBus.Verify(x => x.PublishAsync(
-                It.Is<DirectMessageDeletedEvent>(e => e.MessageId == message.Id),
-                It.IsAny<CancellationToken>()),
+                    It.Is<DirectMessageDeletedEvent>(e => e.MessageId == message.Id),
+                    It.IsAny<CancellationToken>()),
                 Times.Once);
         }
 
@@ -432,7 +434,7 @@ public sealed class MessageServiceTests : IDisposable
 
         // Arrange
         var messages = new List<DirectMessage>();
-        for (int i = 0; i < 10; i++)
+        for (var i = 0; i < 10; i++)
         {
             messages.Add(new DirectMessage
             {
@@ -446,6 +448,7 @@ public sealed class MessageServiceTests : IDisposable
                 SentAt = DateTime.UtcNow.AddMinutes(-i)
             });
         }
+
         context.DirectMessages.AddRange(messages);
         await context.SaveChangesAsync();
 
@@ -481,10 +484,10 @@ public sealed class MessageServiceTests : IDisposable
         await context.SaveChangesAsync();
 
         var request = new UpdateDirectMessageRequest(
-            Content: [7, 8, 9],
-            ContentType: ContentType.Text,
-            MessageNonce: [10, 11, 12],
-            KeyVersion: 2);
+            [7, 8, 9],
+            ContentType.Text,
+            [10, 11, 12],
+            2);
 
         // Act
         var result = await _sut.UpdateDirectAsync(message.Id, TestData.Users.User1.Id, request);
@@ -497,10 +500,10 @@ public sealed class MessageServiceTests : IDisposable
 
         // Verify event was published
         _eventBus.Verify(x => x.PublishAsync(
-            It.Is<DirectMessageUpdatedEvent>(e =>
-                e.Message.Id == message.Id &&
-                e.Message.Content.SequenceEqual(request.Content)),
-            It.IsAny<CancellationToken>()),
+                It.Is<DirectMessageUpdatedEvent>(e =>
+                    e.Message.Id == message.Id &&
+                    e.Message.Content.SequenceEqual(request.Content)),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -513,12 +516,12 @@ public sealed class MessageServiceTests : IDisposable
         var tasks = new List<Task<Result<MessageReactionDto>>>();
 
         // Act
-        for (int i = 0; i < 5; i++)
+        for (var i = 0; i < 5; i++)
         {
             tasks.Add(_sut.AddChannelMessageReactionAsync(
-                messageId: message.Id,
-                userId: TestData.Users.User1.Id,
-                type: ReactionType.Like,
+                message.Id,
+                TestData.Users.User1.Id,
+                ReactionType.Like,
                 ct: CancellationToken.None));
         }
 
@@ -536,10 +539,10 @@ public sealed class MessageServiceTests : IDisposable
         await using var context = await _contextFactory.CreateDbContextAsync();
         var message = await CreateMessageWithAttachment(context);
         var request = new UpdateMessageRequest(
-            Content: new byte[TestData.Settings.LimitSettings.Value.MaxMessageLength + 1],
-            ContentType: ContentType.Text,
-            MessageNonce: [4, 5, 6],
-            KeyVersion: 1);
+            new byte[TestData.Settings.LimitSettings.Value.MaxMessageLength + 1],
+            ContentType.Text,
+            [4, 5, 6],
+            1);
 
         // Act
         var result = await _sut.UpdateAsync(message.Id, message.SenderId, request, CancellationToken.None);
@@ -556,10 +559,10 @@ public sealed class MessageServiceTests : IDisposable
         await using var context = await _contextFactory.CreateDbContextAsync();
         var message = await CreateMessageWithAttachment(context);
         var request = new UpdateMessageRequest(
-            Content: [1, 2, 3],
-            ContentType: ContentType.Text,
-            MessageNonce: [4, 5, 6],
-            KeyVersion: 2);
+            [1, 2, 3],
+            ContentType.Text,
+            [4, 5, 6],
+            2);
 
         // Act
         var result = await _sut.UpdateAsync(message.Id, message.SenderId, request, CancellationToken.None);
@@ -567,11 +570,11 @@ public sealed class MessageServiceTests : IDisposable
         // Assert
         Assert.True(result.IsSuccess);
         _eventBus.Verify(x => x.PublishAsync(
-            It.Is<MessageUpdatedEvent>(e =>
-                e.ChannelId == message.ChannelId &&
-                e.Message.Id == message.Id &&
-                e.Message.KeyVersion == request.KeyVersion),
-            It.IsAny<CancellationToken>()),
+                It.Is<MessageUpdatedEvent>(e =>
+                    e.ChannelId == message.ChannelId &&
+                    e.Message.Id == message.Id &&
+                    e.Message.KeyVersion == request.KeyVersion),
+                It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -583,7 +586,7 @@ public sealed class MessageServiceTests : IDisposable
         var message = await CreateMessageWithAttachment(context);
 
         // Add reactions with specific timestamps for ordering verification
-        for (int i = 0; i < 3; i++)
+        for (var i = 0; i < 3; i++)
         {
             var reaction = new MessageReaction
             {
@@ -595,6 +598,7 @@ public sealed class MessageServiceTests : IDisposable
             };
             context.MessageReactions.Add(reaction);
         }
+
         await context.SaveChangesAsync();
 
         // Act
@@ -606,7 +610,7 @@ public sealed class MessageServiceTests : IDisposable
 
         // Verify ordering by CreatedAt
         var reactions = result.Value.ToList();
-        for (int i = 0; i < reactions.Count - 1; i++)
+        for (var i = 0; i < reactions.Count - 1; i++)
         {
             Assert.True(reactions[i].CreatedAt <= reactions[i + 1].CreatedAt);
         }
@@ -618,14 +622,14 @@ public sealed class MessageServiceTests : IDisposable
         // Arrange
         var userId = TestData.Users.User1.Id;
         var request = new CreateMessageRequest(
-            ChannelId: TestData.Channels.TextChannel.Id,
-            Content: [1, 2, 3],
-            ContentType: ContentType.Text,
-            MessageNonce: [4, 5, 6],
-            KeyVersion: 1);
+            TestData.Channels.TextChannel.Id,
+            [1, 2, 3],
+            ContentType.Text,
+            [4, 5, 6],
+            1);
 
         // Send messages until rate limit is exceeded
-        for (int i = 0; i < TestData.Settings.LimitSettings.Value.RateLimits.Messages.Points; i++)
+        for (var i = 0; i < TestData.Settings.LimitSettings.Value.RateLimits.Messages.Points; i++)
         {
             await _sut.CreateAsync(userId, request);
         }
@@ -635,15 +639,11 @@ public sealed class MessageServiceTests : IDisposable
         Assert.Equal("TooManyRequests", result.Error.Code);
 
         // Wait for rate limit window to expire
-        await Task.Delay(TimeSpan.FromSeconds(TestData.Settings.LimitSettings.Value.RateLimits.Messages.DurationSeconds));
+        await Task.Delay(
+            TimeSpan.FromSeconds(TestData.Settings.LimitSettings.Value.RateLimits.Messages.DurationSeconds));
 
         // Should be able to send message again
         result = await _sut.CreateAsync(userId, request);
         Assert.True(result.IsSuccess);
-    }
-
-    public void Dispose()
-    {
-        TestDbContextFactory.Destroy(_contextFactory);
     }
 }

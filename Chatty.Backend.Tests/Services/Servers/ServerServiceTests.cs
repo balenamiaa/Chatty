@@ -53,14 +53,16 @@ public sealed class ServerServiceTests : IDisposable
         SetupTestData();
     }
 
+    public void Dispose() => TestDbContextFactory.Destroy(_context);
+
     [Fact]
     public async Task CreateAsync_WithValidRequest_CreatesServerWithDefaultChannels()
     {
         // Arrange
         var userId = TestData.User1.Id;
         var request = new CreateServerRequest(
-            Name: "Test Server",
-            IconUrl: null);
+            "Test Server",
+            null);
 
         // Act
         var result = await _sut.CreateAsync(userId, request);
@@ -100,10 +102,10 @@ public sealed class ServerServiceTests : IDisposable
         // Arrange
         var server = await CreateTestServer();
         var request = new CreateServerRoleRequest(
-            Name: "Moderator",
-            Color: "#FF0000",
-            Position: 1,
-            Permissions: new[] { PermissionType.ManageMessages, PermissionType.ManageChannels });
+            "Moderator",
+            "#FF0000",
+            1,
+            [PermissionType.ManageMessages, PermissionType.ManageChannels]);
 
         // Act
         var result = await _sut.CreateRoleAsync(server.Id, request);
@@ -131,11 +133,11 @@ public sealed class ServerServiceTests : IDisposable
             Position = 0,
             Permissions =
             [
-                new() { Permission = PermissionType.ViewChannels },
-                new() { Permission = PermissionType.SendMessages },
-                new() { Permission = PermissionType.ReadMessageHistory },
-                new() { Permission = PermissionType.Connect },
-                new() { Permission = PermissionType.Speak }
+                new ServerRolePermission { Permission = PermissionType.ViewChannels },
+                new ServerRolePermission { Permission = PermissionType.SendMessages },
+                new ServerRolePermission { Permission = PermissionType.ReadMessageHistory },
+                new ServerRolePermission { Permission = PermissionType.Connect },
+                new ServerRolePermission { Permission = PermissionType.Speak }
             ]
         };
 
@@ -195,11 +197,6 @@ public sealed class ServerServiceTests : IDisposable
     {
         _context.Users.AddRange(TestData.User1, TestData.User2);
         _context.SaveChanges();
-    }
-
-    public void Dispose()
-    {
-        TestDbContextFactory.Destroy(_context);
     }
 
     private static class TestData

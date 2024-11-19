@@ -6,15 +6,15 @@ namespace Chatty.Backend.Data.Models.Extensions;
 public static class AttachmentExtensions
 {
     public static AttachmentDto ToDto(this Attachment attachment) => new(
-        Id: attachment.Id,
-        FileName: attachment.FileName,
-        FileSize: attachment.FileSize,
-        ContentType: attachment.ContentType.ToString(),
-        Type: GetAttachmentType(attachment.ContentType),
-        ThumbnailUrl: attachment.ThumbnailPath != null ? $"/attachments/{attachment.Id}/thumbnail" : null,
-        EncryptionKey: attachment.EncryptionKey,
-        EncryptionIv: attachment.EncryptionIv,
-        CreatedAt: attachment.CreatedAt);
+        attachment.Id,
+        attachment.FileName,
+        attachment.FileSize,
+        attachment.ContentType.ToString(),
+        GetAttachmentType(attachment.ContentType),
+        attachment.ThumbnailPath != null ? $"/attachments/{attachment.Id}/thumbnail" : null,
+        attachment.EncryptionKey,
+        attachment.EncryptionIv,
+        attachment.CreatedAt);
 
     private static AttachmentType GetAttachmentType(ContentType contentType) => contentType switch
     {

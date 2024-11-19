@@ -24,11 +24,15 @@ public sealed class UserService(
     {
         // Check if email is already taken
         if (await context.Users.AnyAsync(u => u.Email == request.Email, ct))
+        {
             return Result<UserDto>.Failure(Error.Conflict("Email already taken"));
+        }
 
         // Check if username is already taken
         if (await context.Users.AnyAsync(u => u.Username == request.Username, ct))
+        {
             return Result<UserDto>.Failure(Error.Conflict("Username already taken"));
+        }
 
         try
         {
@@ -61,7 +65,9 @@ public sealed class UserService(
     {
         var user = await context.Users.FindAsync([userId], ct);
         if (user is null)
+        {
             return Result<UserDto>.Failure(Error.NotFound("User not found"));
+        }
 
         try
         {
@@ -69,26 +75,38 @@ public sealed class UserService(
             if (request.Username is not null && request.Username != user.Username)
             {
                 if (await context.Users.AnyAsync(u => u.Username == request.Username, ct))
+                {
                     return Result<UserDto>.Failure(Error.Conflict("Username already taken"));
+                }
 
                 user.Username = request.Username;
             }
 
             // Update other fields
             if (request.FirstName is not null)
+            {
                 user.FirstName = request.FirstName;
+            }
 
             if (request.LastName is not null)
+            {
                 user.LastName = request.LastName;
+            }
 
             if (request.ProfilePictureUrl is not null)
+            {
                 user.ProfilePictureUrl = request.ProfilePictureUrl;
+            }
 
             if (request.StatusMessage is not null)
+            {
                 user.StatusMessage = request.StatusMessage;
+            }
 
             if (request.Locale is not null)
+            {
                 user.Locale = request.Locale;
+            }
 
             user.UpdatedAt = DateTime.UtcNow;
 
@@ -109,7 +127,9 @@ public sealed class UserService(
     {
         var user = await context.Users.FindAsync([userId], ct);
         if (user is null)
+        {
             return Result<bool>.Success(true); // Already deleted
+        }
 
         try
         {
@@ -131,7 +151,9 @@ public sealed class UserService(
     {
         var user = await context.Users.FindAsync([userId], ct);
         if (user is null)
+        {
             return Result<UserDto>.Failure(Error.NotFound("User not found"));
+        }
 
         return Result<UserDto>.Success(user.ToDto());
     }
@@ -144,7 +166,9 @@ public sealed class UserService(
             .FirstOrDefaultAsync(u => u.Email == email, ct);
 
         if (user is null)
+        {
             return Result<UserDto>.Failure(Error.NotFound("User not found"));
+        }
 
         return Result<UserDto>.Success(user.ToDto());
     }
@@ -157,7 +181,9 @@ public sealed class UserService(
             .FirstOrDefaultAsync(u => u.Username == username, ct);
 
         if (user is null)
+        {
             return Result<UserDto>.Failure(Error.NotFound("User not found"));
+        }
 
         return Result<UserDto>.Success(user.ToDto());
     }
@@ -175,11 +201,15 @@ public sealed class UserService(
 
         var user = await context.Users.FindAsync([userId], ct);
         if (user is null)
+        {
             return Result<bool>.Failure(Error.NotFound("User not found"));
+        }
 
         // Verify current password
         if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
+        {
             return Result<bool>.Failure(Error.Unauthorized("Invalid current password"));
+        }
 
         try
         {
@@ -205,7 +235,9 @@ public sealed class UserService(
             .FirstOrDefaultAsync(u => u.Email == email, ct);
 
         if (user is null)
+        {
             return Result<bool>.Success(true); // Don't reveal if email exists
+        }
 
         try
         {
@@ -230,7 +262,9 @@ public sealed class UserService(
             .FirstOrDefaultAsync(u => u.Email == email, ct);
 
         if (user is null)
+        {
             return Result<bool>.Failure(Error.NotFound("User not found"));
+        }
 
         try
         {
@@ -249,29 +283,37 @@ public sealed class UserService(
         }
     }
 
-    private string HashPassword(string password)
-    {
-        return BCrypt.Net.BCrypt.HashPassword(
+    private string HashPassword(string password) =>
+        BCrypt.Net.BCrypt.HashPassword(
             password,
-            workFactor: _securitySettings.PasswordHashingIterations);
-    }
+            _securitySettings.PasswordHashingIterations);
 
     private bool ValidatePassword(string password)
     {
         if (password.Length < _securitySettings.MinPasswordLength)
+        {
             return false;
+        }
 
         if (_securitySettings.RequireUppercase && !password.Any(char.IsUpper))
+        {
             return false;
+        }
 
         if (_securitySettings.RequireLowercase && !password.Any(char.IsLower))
+        {
             return false;
+        }
 
         if (_securitySettings.RequireDigit && !password.Any(char.IsDigit))
+        {
             return false;
+        }
 
         if (_securitySettings.RequireSpecialChar && !password.Any(c => !char.IsLetterOrDigit(c)))
+        {
             return false;
+        }
 
         return true;
     }
